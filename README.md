@@ -6,8 +6,6 @@
 <h4 align="center">Rapidly host payloads and post-exploitation bins over http or https.</h4>
 <h6 align="center">Designed to be used on exams like OSCP / PNPT or CTFs HTB / etc.</h4>
 <h6 align="center">Pull requests and issues welcome. As are any contributions.</h4>
-<h6 align="center">Batteries included.</h4>
-
 
 <p align="center">
   <a href="#install">Install</a> •
