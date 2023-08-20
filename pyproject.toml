@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "qu1ckdr0p"
+version = "1.0.0"
+description = "Rapid file hosting."
+authors = ["byinarie <byinarie@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+click = "8.1.6"
+flask = "2.2.2"
+netifaces = "0.11.0"
+requests = "2.31.0"
+tqdm = "4.64.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[build]
+include = [
+    "serv.py",
+    "config/**/*",
+    "certs/**/*",
+    "img/**/*",
+    "linux/**/*",
+    "mac/**/*",
+    "windows/**/*"
+]
