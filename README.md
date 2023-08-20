@@ -32,7 +32,7 @@ alias serv="python3 /opt/qu1ckdr0p/serv.py" (or add to ~/.zshrc)
 ## Examples 
 
 ### Basic usage
-#### Defaults to http:80
+#### Defaults to http:80 over iface tun0
 
 ```zsh
 serv.py serve -d /path 
