@@ -321,13 +321,13 @@ telegram = ["requests"]
 
 [[package]]
 name = "urllib3"
-version = "1.26.0"
+version = "1.26.5"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4"
 files = [
-    {file = "urllib3-1.26.0-py2.py3-none-any.whl", hash = "sha256:bad31cb622ceee0ab46c4c884cf61957def0ff2e644de0a7a093678844c9ccac"},
-    {file = "urllib3-1.26.0.tar.gz", hash = "sha256:4849f132941d68144df0a3785ccc4fe423430ba5db0108d045c8cadbc90f517a"},
+    {file = "urllib3-1.26.5-py2.py3-none-any.whl", hash = "sha256:753a0374df26658f99d826cfe40394a686d05985786d946fbe4165b5148f5a7c"},
+    {file = "urllib3-1.26.5.tar.gz", hash = "sha256:a7acd0977125325f516bda9735fa7142b909a8d01e8b2e4c8108d0984e6e0098"},
 ]
 
 [package.extras]
@@ -355,4 +355,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "3220e552bddbf9f3b4dc16f757fca04d9e762fadd3e7252240459713e5fcbf04"
+content-hash = "9a68116b15ff5dc475f7efb8c61075a42a5f570862ab41eee8bca726159d0afe"
