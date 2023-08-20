@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "qu1ckdr0p"
+name = "qu1ckdr0p2"
 version = "1.0.0"
 description = "Rapid file hosting."
 authors = ["byinarie <byinarie@gmail.com>"]
@@ -11,8 +11,9 @@ python = "^3.11"
 click = "8.1.6"
 flask = "2.2.5"
 netifaces = "0.11.0"
-requests = "2.31.0"
+requests = "2.29.0"
 tqdm = "4.64.1"
+urllib3 = "1.26.0"
 
 
 [build-system]
@@ -21,11 +22,18 @@ build-backend = "poetry.core.masonry.api"
 
 [build]
 include = [
+    "certs/**/*",
+    "downloads/**/*",
+    "LICENSE",
+    "mac/**/*",
+    "pyproject.toml",
+    "README.md",
     "serv.py",
     "config/**/*",
-    "certs/**/*",
     "img/**/*",
     "linux/**/*",
-    "mac/**/*",
+    "poetry.lock",
+    "qu1ckdr0p.code-workspace",
+    "requirements.txt",
     "windows/**/*"
 ]
