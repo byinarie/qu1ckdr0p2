@@ -21,5 +21,5 @@ build-backend = "poetry.core.masonry.api"
 
 [build]
 exclude = [
-    "config/settings.ini
+    "config/settings.ini"
 ]
