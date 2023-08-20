@@ -27,6 +27,7 @@ git clone https://github.com/byinarie/qu1ckdr0p.git /opt/qu1ckdr0p
 cd /opt/qu1ckdr0p/ 
 poetry install
 sudo apt install kali-tools-windows-resources
+sudo apt install kali-tools-post-exploitation
 alias serv="python3 /opt/qu1ckdr0p/serv.py" (or add to ~/.zshrc)
 ```
 
