@@ -3,7 +3,7 @@
     <img src="img/quick_drop_small.png"</img>
 </h1>
 
-<h4 align="center">Rapidly host payloads and post exploitation bins over http or https.</h4>
+<h4 align="center">Rapidly host payloads and post-exploitation bins over http or https.</h4>
 <h6 align="center">Designed to be used on exams like OSCP / PNPT or CTFs HTB / etc.</h4>
 <h6 align="center">Pull requests and issues welcome. As are any contributions.</h4>
 <h6 align="center">Batteries included.</h4>
@@ -17,9 +17,9 @@
 </p>
 
 ## About
-Host files fast using aliases, specify a directory (-d), or specify a file (-f). Set serv.py as an alias to use it anywhere. Supports hosting over http or https. If https is chosen it will generate a certificate and use it automatically. The interface is chosen by priority, if tun0 is up then tun0 will be used, otherwise it will use eth0. Download tooling to serve or set your own aliases using the ini files. Downloads require a github API token.
+Host files fast using aliases, specify a directory (-d), or specify a file (-f). Set serv.py as an alias to use it anywhere. Supports hosting over http or https. If https is chosen it will generate a certificate and use it automatically. The interface is chosen by priority, if tun0 is up then tun0 will be used, otherwise, it will use eth0. Download tooling to serve or set your own aliases using the ini files. Downloads require a GitHub API token.
 
-Qu1ckdr0p comes with some tools in windows/ and linux/ by default, along with some default repos in config/repos.ini. Not all of the default tools have compiled binaries released in their source code repos (e.g: ghostpack) so compiled ones are included without the release repo added. Running `serv.py update` (requires github api key) will reach out to the repos configured in config/repos.ini, download them, and move them into the correct platform directory. All of the tools in the qu1ckdr0p repo and all of the Kali default tools (or most of them) also have a built in alias.
+Qu1ckdr0p comes with some tools in windows/ and linux/ by default, along with some default repos in config/repos.ini. Not all of the default tools have compiled binaries released in their source code repos (e.g.: ghostpack) so compiled ones are included without the release repo added. Running `serv.py update` (requires github api key) will reach out to the repos configured in config/repos.ini, download them, and move them into the correct platform directory. All of the tools in the qu1ckdr0p repo and all of the Kali default tools (or most of them) also have a built-in alias.
 
 ## Install
 ```zsh
@@ -48,7 +48,7 @@ serv.py list --search "mimikatz"
 serv.py list
 ```
 
-### Serve a windows privledge escalation directory over HTTPS 8443
+### Serve a windows privilege escalation directory over HTTPS 8443
 
 ```zsh
 serv.py serve windows --https --port 8443
@@ -83,7 +83,7 @@ serv.py serve -f /usr/share/windows-resources/binaries/nc.exe --https --port 844
 <p><img src="img/serv_single_file.jpg"</img><p>
 
 
-### Serve a directory over default
+### Serve a directory over the default http:80
 
 ```zsh
 serv.py serve -d /usr/share/windows-resources/binaries
