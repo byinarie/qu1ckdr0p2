@@ -14,6 +14,9 @@ netifaces = "0.11.0"
 requests = "2.31.0"
 tqdm = "4.65.0"
 
+[tool.poetry.scripts]
+qu1ckdr0p = "qu1ckdr0p2.serv:main"
+
 
 [build-system]
 requires = ["poetry-core"]
