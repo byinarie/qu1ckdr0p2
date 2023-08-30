@@ -39,9 +39,9 @@ def generate_self_signed_cert(cert_dir):
         cert.get_subject().C = "US"
         cert.get_subject().ST = "CA"
         cert.get_subject().L = "San Francisco"
-        cert.get_subject().O = "qu1ckdr0p"
-        cert.get_subject().OU = "qu1ckdr0p"
-        cert.get_subject().CN = "byinarie@localhost"
+        cert.get_subject().O = "qu1ckdr0p2"
+        cert.get_subject().OU = "qu1ckdr0p2"
+        cert.get_subject().CN = "byinarie@deadcell.dev"
         cert.set_serial_number(1000)
         cert.gmtime_adj_notBefore(0)
         cert.gmtime_adj_notAfter(315360000)  # Valid for 10 years
@@ -82,11 +82,6 @@ def get_serving_ip():
     return '0.0.0.0'
 
 
-
-
-
-
-
 def extract_archive(archive_path, download_directory):
     file_list = []
 
@@ -124,7 +119,7 @@ def extract_archive(archive_path, download_directory):
         finally:
             click.echo(click.style(f"[+] Extracted {filename} to {download_directory}", fg='green'))
 
-            
+           
 def process_file(file_path):
     files = os.listdir(file_path)
     linux = os.getcwd() + "/linux"
@@ -276,7 +271,9 @@ def serve(alias=None, directory=None, file=None, https=False, port=8080):
 
 def display_aliases(search=None):
     config = configparser.ConfigParser()
-    config.read('config/common.ini')  
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    common_ini_path = os.path.join(script_dir, 'config/common.ini')
+    config.read(common_ini_path)
 
     for section in config.sections():
         for key, value in config.items(section):
