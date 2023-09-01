@@ -1,9 +1,8 @@
 name: Sync Repositories
 
+
 on:
-  push:
-    paths:
-      - '.github/workflows/sync-repos.yml'
+  workflow_dispatch:
 
 jobs:
   sync:
