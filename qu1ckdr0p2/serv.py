@@ -1,3 +1,4 @@
+import hashlib
 from flask import Flask, send_from_directory
 from tqdm import tqdm
 from OpenSSL import crypto
@@ -7,16 +8,13 @@ import logging
 import click
 import configparser
 import requests
-import zipfile
-import shutil
-import subprocess
+from concurrent.futures import ThreadPoolExecutor
+
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 user_home = os.path.expanduser("~")
 base_dir = os.path.join(user_home, ".qu1ckdr0p2")
-# base_dir = os.path.expanduser("~/.qu1ckdr0p")
-
 
 config = configparser.ConfigParser()
 common_ini_path = os.path.join(base_dir, 'config/common.ini')
@@ -28,7 +26,6 @@ blacklist_keywords = ['sample', 'arm64', 'readme.md', 'readme', 'license', 'mips
 @click.group()
 def cli():
     pass
-
 
 def generate_self_signed_cert(cert_dir):
     if not os.path.exists(cert_dir):
@@ -64,9 +61,7 @@ def generate_self_signed_cert(cert_dir):
         click.echo(click.style(f"[+] Certificate and key generated at {cert_path} and {key_path}", fg='green'))
 
     return cert_path, key_path
-
-
-            
+          
 def get_interface_ip(interface):
     try:
         ip = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
@@ -82,125 +77,6 @@ def get_serving_ip():
     if eth0_ip:
         return eth0_ip
     return '0.0.0.0'
-
-
-def extract_archive(archive_path, download_directory):
-    file_list = []
-
-    for root, _, files in os.walk(download_directory):
-        for file in files:
-            file_extension = os.path.splitext(file)[1]
-            if file_extension in ['.zip', '.gz', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tbz', '.tar.xz', '.txz', '.tar']:
-                file_list.append(os.path.join(root, file))
-
-    for file in tqdm(file_list, desc='Extracting archives', unit='archive'):
-        try:
-            filename = os.path.basename(file)
-            file_extension = os.path.splitext(filename)[-1]
-            archive_path = os.path.join(root, file)
-
-            if file_extension == '.zip':
-                with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                    zip_ref.extractall(download_directory)
-
-                    for subdir, _, files in os.walk(download_directory):
-                        for sub_file in files:
-                            if subdir != download_directory:  # Avoid moving files that are already in the target directory, eventually this should be removed
-                                src_path = os.path.join(subdir, sub_file)
-                                dest_path = os.path.join(download_directory, sub_file)
-                                shutil.move(src_path, dest_path)
-
-                    for subdir in [d for d in os.listdir(download_directory) if os.path.isdir(os.path.join(download_directory, d))]:
-                        shutil.rmtree(os.path.join(download_directory, subdir))
-            elif file_extension in ['.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tbz', '.tar.xz', '.txz', '.tar']:
-                os.system(f"tar -xvf {archive_path} -C {download_directory}")
-            elif file_extension == '.gz':
-                os.system(f"gunzip -d {archive_path} {download_directory}")
-        except Exception as e:
-            click.echo(click.style(f"[-] Failed to extract {filename}", fg='red'))
-        finally:
-            click.echo(click.style(f"[+] Extracted {filename} to {download_directory}", fg='green'))
-
-           
-def process_file(file_path):
-    files = os.listdir(file_path)
-    linux = os.getcwd() + "/linux"
-    mac = os.getcwd() + "/mac"
-    windows = os.getcwd() + "/windows"
-    blacklist_keywords = ["readme.md", "license", "file hash.txt"]  
-
-    for filename in tqdm(files, desc='Processing files', unit='file'):
-        if filename.lower() in [name.lower() for name in blacklist_keywords]:
-            continue
-        
-        file_full_path = os.path.join(file_path, filename)
-        try:
-            file_type = subprocess.check_output(["file", "--brief", file_full_path]).decode().strip()
-            
-            if "executable" in file_type and "ELF" in file_type:
-                shutil.copy(file_full_path, linux)
-            elif "Mach-O" in file_type:
-                shutil.copy(file_full_path, mac)
-            elif "MS-DOS executable" in file_type or "PE32" in file_type:
-                shutil.copy(file_full_path, windows)
-            elif "Bourne-Again shell script" in file_type or "POSIX shell script" in file_type:
-                shutil.copy(file_full_path, linux)
-            elif "ASCII text" in file_type:
-                shutil.copy(file_full_path, windows)
-        except subprocess.CalledProcessError:
-            click.echo(click.style(f"[-] Failed to process {filename}", fg='red'))
-
-def download_latest_release(tool_name, release_url, download_dir):
-    config = configparser.ConfigParser()
-    config.read('config/settings.ini')
-    api_key = config['GitHub']['API_KEY']
-    headers = {'Authorization': f'token {api_key}'}
-    user, repo = release_url.split('/')[3:5]
-    api_url = f'https://api.github.com/repos/{user}/{repo}/releases/latest'
-    response = requests.get(api_url, headers=headers)
-    if response.status_code != 200:
-        click.echo(click.style(f"[-] Failed to fetch the latest release for {tool_name}", fg='red'))
-        return
-
-    assets = response.json().get('assets', [])
-    for asset in assets:
-        if 'source' in asset['name'] or any(keyword in asset['name'] for keyword in blacklist_keywords):
-            continue
-
-        download_url = asset['browser_download_url']
-        response = requests.get(download_url, stream=True)
-        file_path = os.path.join(download_dir, asset['name'])
-        with open(file_path, 'wb') as file:
-            shutil.copyfileobj(response.raw, file)
-        click.echo(click.style(f"[+] Downloaded {tool_name} to {file_path}", fg='green'))
-        
-def download_latest_releases(download_dir):
-    config = configparser.ConfigParser()
-    config.read('config/repos.ini')
-    repos = list(config.items('REPOS'))
-    
-    # print("Repos:", repos) for debugging
-
-    with tqdm(repos, desc="Downloading repositories", unit="repo") as t:
-        for tool_name, release_url in t:
-            download_latest_release(tool_name, release_url, download_dir)     
-             
-def update_repositories(file_path, download_dir):
-    create_directories()
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    downloads_dir = os.path.join(script_dir, 'downloads')
-    download_latest_releases(downloads_dir)
-
-    extract_archive(file_path, download_directory)
-
-    process_file(file_path)
-
-
-
-@cli.command()
-def update():
-    """Update tools in linux/ mac/ and windows/ (messy but works)"""
-    update_repositories(download_directory, target_directory)
 
 @cli.command()
 @click.argument('alias', type=str, required=False)
@@ -279,67 +155,103 @@ def display_aliases(search=None):
                 continue
             click.echo(f"Alias: {alias_name}\nPath: {alias_path}\n")
             
+                        
 @cli.command()
-def init():
-    repo_base_url = "https://github.com/byinarie/qu1ckdr0p2.git"
-    sparse_folders = ["linux", "windows", "mac", "config"]
-    ini_files = ["common.ini", "repos.ini", "settings.ini.template"]
+@click.option('--check', is_flag=True, help='Check and download missing or outdated files.')
+@click.option('--skip-config', is_flag=True, help='Skip checking the config directory.')
+@click.option('--skip-windows', is_flag=True, help='Skip checking the windows directory.')
+@click.option('--skip-linux', is_flag=True, help='Skip checking the linux directory.')
+@click.option('--skip-mac', is_flag=True, help='Skip checking the mac directory.')
+@click.option('--api-key', help='GitHub API key for authentication')
+def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key):
+    user_home = os.path.expanduser("~")
+    base_dir = os.path.join(user_home, ".qu1ckdr0p2")
+    directory = os.path.dirname(os.path.abspath(__file__))
+    target_directories = ["config", "windows", "linux", "mac"]
 
     if not os.path.exists(base_dir):
         os.makedirs(base_dir)
 
-    config_dir = os.path.join(base_dir, "config")
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
+    for dir_name in target_directories:
+        dir_path = os.path.join(base_dir, dir_name)
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
 
-    for ini_file in ini_files:
-        url = f"https://raw.githubusercontent.com/byinarie/qu1ckdr0p2/main/qu1ckdr0p2/config/{ini_file}"
-        r = requests.get(url)
-        with open(os.path.join(config_dir, ini_file), 'wb') as f:
-            f.write(r.content)
+    click.echo(click.style(f"[+] Directories exist. Continuing.", fg='green'))
+    
+    
+    for target_dir in target_directories:
+        full_path = os.path.join(base_dir, target_dir)
+        print(full_path)
+    
+    repo_owner = "byinarie"
+    repo_name = "qu1ckdr0p2"
+    
+    headers = {'Authorization': f'token {api_key}'} if api_key else None
+    if api_key:
+        click.echo(click.style(f"[+] Using GitHub API key for authentication", fg='green'))
+    else:
+        click.echo(click.style(f"[-] No GitHub API key provided, using unauthenticated requests", fg='yellow'))
+        click.echo(click.style(f"[-] Anauthenticated requests are subject to higher limiting", fg='yellow')) 
+        click.echo(click.style(f"[-] You can create a token here: https://github.com/settings/tokens/new", fg='yellow')) 
+               
+    for directory in target_directories:
+        if (skip_config and directory == 'config') or (skip_windows and directory == 'windows') or (skip_linux and directory == 'linux') or (skip_mac and directory == 'mac'):
+            continue
+        
+        target_path = os.path.join(base_dir, directory)
+        target_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/qu1ckdr0p2/{directory}"
+            
+        response = requests.get(target_url, headers=headers)
+        if response.status_code != 200:
+            click.echo(click.style(f"[-] Failed to fetch directory contents: {target_url}. Status Code: {response.status_code}, Reason: {response.reason}", fg='red'))
+            continue
 
-    create_directories()
+        files = response.json()
+        local_files = list_local_files(target_path)
+        for file_info in files:
+            if file_info['type'] != 'file':
+                continue
+            
+            file_name = file_info['name']
+            file_url = file_info.get('download_url')
+            if not file_url:
+                click.echo(click.style(f"[-] Download URL not found for {file_name}", fg='red'))
+                continue
+            
+            file_path = os.path.join(target_path, file_name)
+            
+            if check:
+                if file_name not in local_files:
+                    download_and_save_file(file_url, file_path)
+                else:
+                    with open(file_path, 'rb') as f:
+                        existing_content = f.read()
+                    existing_sha1 = calculate_git_blob_sha1(existing_content)
+                    expected_sha1 = file_info.get('sha')
 
-    for folder in sparse_folders:
-        target_folder = os.path.join(base_dir, folder)
-        if not os.path.exists(target_folder):
-            os.makedirs(target_folder)
-        subprocess.run(["git", "clone", "--depth", "1", "--no-checkout", repo_base_url, target_folder])
+                    if existing_sha1 != expected_sha1:
+                        download_and_save_file(file_url, file_path)
+                        click.echo(click.style(f"[+] Updated {file_path}", fg='green'))
+            else:
+                download_and_save_file(file_url, file_path)
+                
+def download_and_save_file(url, file_path):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+            click.echo(click.style(f"[+] Downloaded {file_path}", fg='green'))
+    else:
+        click.echo(click.style(f"[-] Failed to download {file_path}", fg='red'))
 
-    for folder in sparse_folders:
-        subdirectory_path = f"qu1ckdr0p2/{folder}"  # Relative path to the subdirectory
-        target_subdirectory = os.path.join(base_dir, folder)  # Target local subdirectory
-
-        # Perform sparse checkout
-        subprocess.run(["git", "sparse-checkout", "set", subdirectory_path], cwd=target_subdirectory)
-
-        # Perform checkout to apply sparse checkout
-        subprocess.run(["git", "checkout"], cwd=target_subdirectory)
-
-    click.echo("Initialization complete.")
-
-def create_directories():
-    directories = ["downloads", "windows", "linux", "mac"]
-    for directory in directories:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
-def resolve_absolute_path(relative_path):
-    user_home = os.path.expanduser("~")
-    base_paths = {
-        "windows": os.path.join(user_home, ".qu1ckdr0p2/windows"),
-        "linux": os.path.join(user_home, ".qu1ckdr0p2/linux"),
-        "mac": os.path.join(user_home, ".qu1ckdr0p2/mac"),
-        "config": os.path.join(user_home, ".qu1ckdr0p2/config"),
-        "certs": os.path.join(user_home, ".qu1ckdr0p2/certs"),
-        "payloads": os.path.join(user_home, ".qu1ckdr0p2/payloads")
-    }
-    for key, base_path in base_paths.items():
-        if relative_path.startswith(key):
-            return os.path.join(base_path, relative_path[len(key)+1:])
-    return relative_path
+def calculate_git_blob_sha1(data):
+    content_length = len(data)
+    return hashlib.sha1(f'blob {content_length}\0'.encode() + data).hexdigest()
 
 
+def list_local_files(directory_path):
+    return set(os.listdir(directory_path))
 
 if __name__ == "__main__":
     download_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads/')
