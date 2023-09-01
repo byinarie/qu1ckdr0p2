@@ -1,0 +1,19 @@
+name: Sync Windows Directory
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Sync Windows Directory
+        run: |
+          cp -r ../SharpCollection/qu1ckdr0p2/windows/* qu1ckdr0p2/windows
+
