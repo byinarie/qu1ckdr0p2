@@ -12,9 +12,9 @@ jobs:
       uses: actions/checkout@v2
       with:
         repository: 'byinarie/qu1ckdr0p2'
-        ref: 'main'
+        ref: 'dev'  
         path: 'qu1ckdr0p2'
-        fetch-depth: 0 # Fetch all history for all branches and tags
+        fetch-depth: 0  
         token: ${{ secrets.QU1CKDR0P_UPDATE }}
 
     - name: Clone SharpCollection repository
@@ -49,4 +49,4 @@ jobs:
         git config --local user.name "GitHub Action"
         git add -A
         git commit -m "Sync SharpCollection into qu1ckdr0p2/windows: ${LATEST_COMMIT}"
-        git push origin dev
+        git push origin dev  # Modified to push to 'dev' branch
