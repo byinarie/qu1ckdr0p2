@@ -15,4 +15,4 @@ jobs:
 
       - name: Sync Windows Directory
         run: |
-          cp -r ../SharpCollection/qu1ckdr0p2/windows/* qu1ckdr0p2/windows
+          rsync -a ../SharpCollection/qu1ckdr0p2/windows/ qu1ckdr0p2/windows/
