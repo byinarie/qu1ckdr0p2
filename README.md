@@ -15,18 +15,18 @@
 </p>
 
 ## About
-Host files fast using aliases, specify a directory (-d), or specify a file (-f). Set serv.py as an alias to use it anywhere. Supports hosting over http or https. If https is chosen it will generate a certificate and use it automatically. The interface is chosen by priority, if tun0 is up then tun0 will be used, otherwise, it will use eth0. Download tooling to serve or set your own aliases using the ini files. Downloads require a GitHub API token.
+Host files fast using aliases, specify a directory (-d), or specify a file (-f). Set serv as an alias to use it anywhere. Supports hosting over http or https. If https is chosen it will generate a certificate and use it automatically. The interface is chosen by priority, if tun0 is up then tun0 will be used, otherwise, it will use eth0. Download tooling to serve or set your own aliases using the ini files. Downloads require a GitHub API token.
 
-Qu1ckdr0p comes with some tools in windows/ and linux/ by default, along with some default repos in config/repos.ini. Not all of the default tools have compiled binaries released in their source code repos (e.g.: ghostpack) so compiled ones are included without the release repo added. Running `serv.py update` (requires github api key) will reach out to the repos configured in config/repos.ini, download them, and move them into the correct platform directory. All of the tools in the qu1ckdr0p repo and all of the Kali default tools (or most of them) also have a built-in alias.
+Qu1ckdr0p comes with some tools in windows/ and linux/ by default, along with some default repos in config/repos.ini. Not all of the default tools have compiled binaries released in their source code repos (e.g.: ghostpack) so compiled ones are included without the release repo added. Running `serv update` (requires github api key) will reach out to the repos configured in config/repos.ini, download them, and move them into the correct platform directory. All of the tools in the qu1ckdr0p repo and all of the Kali default tools (or most of them) also have a built-in alias.
 
 ## Install
 ```zsh
 git clone https://github.com/byinarie/qu1ckdr0p.git /opt/qu1ckdr0p
-cd /opt/qu1ckdr0p/ 
+cd /opt/qu1ckdr0p/
 poetry install
 sudo apt install kali-tools-windows-resources
 sudo apt install kali-tools-post-exploitation
-alias serv="python3 /opt/qu1ckdr0p/serv.py" (or add to ~/.zshrc)
+alias serv="python3 /opt/qu1ckdr0p2/qu1ckdr0p2/serv.py" (or add to ~/.zshrc)
 ```
 
 ## Examples 
@@ -35,21 +35,21 @@ alias serv="python3 /opt/qu1ckdr0p/serv.py" (or add to ~/.zshrc)
 #### Defaults to http:80 over iface tun0
 
 ```zsh
-serv.py serve -d /path 
-serv.py serve -d /path --https --port 443
-serv.py serve -f /path/file.bin --https --port 443
-serv.py serve linux --https --port 443
-serv.py serve windows --https --port 443
-serv.py serve seatbelt --https --port 443
-serv.py serve mimikatz --https --port 443
-serv.py list --search "mimikatz"
-serv.py list
+serv serve -d /path 
+serv serve -d /path --https --port 443
+serv serve -f /path/file.bin --https --port 443
+serv serve linux --https --port 443
+serv serve windows --https --port 443
+serv serve seatbelt --https --port 443
+serv serve mimikatz --https --port 443
+serv list --search "mimikatz"
+serv list
 ```
 
 ### Serve a windows privilege escalation directory over HTTPS 8443
 
 ```zsh
-serv.py serve windows --https --port 8443
+serv serve windows --https --port 8443
 # Pre configured post windows directory is: ./windows = /windows
 # see: config/common.ini
 ```
@@ -58,15 +58,15 @@ serv.py serve windows --https --port 8443
 ### Serve the working directory
 
 ```zsh
-serv.py serve 
+serv serve 
 ```
 <p><img src="img/working_dir.jpg"</img></p>
 
 ### List currently configured aliases and search for a specific bin
 
 ```zsh
-serv.py serve list --search winpeas
-serv.py serve list 
+serv serve list --search winpeas
+serv serve list 
 
 ```
 
@@ -76,7 +76,7 @@ serv.py serve list
 ### Serve a single file over HTTPS 8443
 
 ```zsh
-serv.py serve -f /usr/share/windows-resources/binaries/nc.exe --https --port 8443
+serv serve -f /usr/share/windows-resources/binaries/nc.exe --https --port 8443
 ```
 <p><img src="img/serv_single_file.jpg"</img><p>
 
@@ -84,7 +84,7 @@ serv.py serve -f /usr/share/windows-resources/binaries/nc.exe --https --port 844
 ### Serve a directory over the default http:80
 
 ```zsh
-serv.py serve -d /usr/share/windows-resources/binaries
+serv serve -d /usr/share/windows-resources/binaries
 ```
 <p><img src="img/serve_directory.jpg"</img></p>
 
@@ -93,7 +93,7 @@ serv.py serve -d /usr/share/windows-resources/binaries
 #### Modify config/repos.ini as needed
 
 ```zsh
-serv.py update
+serv update
 ```
 <p><img src="img/update.jpg"</img></p>
 

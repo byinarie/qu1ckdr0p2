@@ -13,9 +13,13 @@ import subprocess
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
+user_home = os.path.expanduser("~")
+base_dir = os.path.join(user_home, ".qu1ckdr0p2")
+# base_dir = os.path.expanduser("~/.qu1ckdr0p")
+
+
 config = configparser.ConfigParser()
-script_dir = os.path.dirname(os.path.abspath(__file__))
-common_ini_path = os.path.join(script_dir, 'config/common.ini')
+common_ini_path = os.path.join(base_dir, 'config/common.ini')
 config.read(common_ini_path)
 # print(config.sections())
 # print(config.items("._DIR"))
@@ -24,6 +28,8 @@ blacklist_keywords = ['sample', 'arm64', 'readme.md', 'readme', 'license', 'mips
 @click.group()
 def cli():
     pass
+
+
 def generate_self_signed_cert(cert_dir):
     if not os.path.exists(cert_dir):
         os.makedirs(cert_dir)
@@ -59,11 +65,7 @@ def generate_self_signed_cert(cert_dir):
 
     return cert_path, key_path
 
-def create_directories():
-    directories = ["downloads", "windows", "linux", "mac"]
-    for directory in directories:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+
             
 def get_interface_ip(interface):
     try:
@@ -200,7 +202,6 @@ def update():
     """Update tools in linux/ mac/ and windows/ (messy but works)"""
     update_repositories(download_directory, target_directory)
 
-
 @cli.command()
 @click.argument('alias', type=str, required=False)
 @click.option('-d', '--directory', type=click.Path(exists=True, file_okay=False), help='Path to the directory to serve.')
@@ -208,13 +209,10 @@ def update():
 @click.option('--https', is_flag=True, help='Use HTTPS instead of HTTP.')
 @click.option('--port', default=80, help='Port number to run the server on.')
 def serve(alias=None, directory=None, file=None, https=False, port=8080):
-    """Serve your bin: serv.py $alias, serv.py -d $dir, or serv.py -f $file"""
+    global base_dir  # Make sure to use the global base_dir variable
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    common_ini_path = os.path.join(script_dir, 'config/common.ini')
-    config.read(common_ini_path)
     if directory and file:
-        click.echo(click.style(f"[-] Please provide either a directory path or a file path, not both.", fg='red'))
+        click.echo("Please provide either a directory path or a file path, not both.")
         return
 
     if https:
@@ -237,24 +235,23 @@ def serve(alias=None, directory=None, file=None, https=False, port=8080):
 
         if dir_section:
             relative_path = config.get(dir_section, alias, fallback=None)
-            path_to_serve = os.path.join(script_dir, relative_path)
+            path_to_serve = os.path.join(base_dir, relative_path)  # Use base_dir here
         else:
-            click.echo(click.style(f"[-] Alias '{alias}' not found in config/common.ini.", fg='red'))
+            click.echo(f"Alias '{alias}' not found in config/common.ini.")
             return
     else:
-        path_to_serve = os.getcwd()
+        path_to_serve = base_dir 
 
     ip_address = get_serving_ip()
     protocol = 'https' if https else 'http'
     app = Flask(__name__)
-
     if os.path.isdir(path_to_serve):
-        click.echo(click.style(f"[+] Serving at {protocol}://{ip_address}:{port}/", fg='green'))
+        click.echo(f"Serving at {protocol}://{ip_address}:{port}/")
         for filename in os.listdir(path_to_serve):
-            click.echo(click.style(f"{protocol}://{ip_address}:{port}/{filename}", fg='green'))
+            click.echo(f"{protocol}://{ip_address}:{port}/{filename}")
     else:
         filename = os.path.basename(path_to_serve)
-        click.echo(click.style(f"[+] Serving at {protocol}://{ip_address}:{port}/{filename}", fg='green'))
+        click.echo(f"Serving at {protocol}://{ip_address}:{port}/{filename}")
 
     @app.route('/<path:filename>')
     def serve_directory(filename):
@@ -262,26 +259,10 @@ def serve(alias=None, directory=None, file=None, https=False, port=8080):
             full_path = os.path.join(path_to_serve, filename)
         else:
             full_path = path_to_serve if filename == os.path.basename(path_to_serve) else None
-
         if full_path and os.path.exists(full_path):
             return send_from_directory(os.path.dirname(full_path), os.path.basename(full_path))
         return "File not found", 404
-
     app.run(host=ip_address, port=port, ssl_context=ssl_context)
-
-def display_aliases(search=None):
-    config = configparser.ConfigParser()
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    common_ini_path = os.path.join(script_dir, 'config/common.ini')
-    config.read(common_ini_path)
-
-    for section in config.sections():
-        for key, value in config.items(section):
-            alias_name = key
-            alias_path = value
-            if search and (search.lower() not in alias_name.lower() and search.lower() not in alias_path.lower()):
-                continue
-            click.echo(click.style(f"Alias: {alias_name}\nPath: {alias_path}\n", fg='green'))
 
 @cli.command(name="list")
 @click.option('--search', type=str, help='Search for a specific alias using a search string.')
@@ -289,8 +270,77 @@ def list_aliases(search):
     """List all aliases or search for a specific alias."""
     display_aliases(search)  
 
+def display_aliases(search=None):
+    for section in config.sections():
+        for key, value in config.items(section):
+            alias_name = key
+            alias_path = os.path.join(base_dir, value)
+            if search and (search.lower() not in alias_name.lower() and search.lower() not in alias_path.lower()):
+                continue
+            click.echo(f"Alias: {alias_name}\nPath: {alias_path}\n")
+            
+@cli.command()
+def init():
+    repo_base_url = "https://github.com/byinarie/qu1ckdr0p2.git"
+    sparse_folders = ["linux", "windows", "mac", "config"]
+    ini_files = ["common.ini", "repos.ini", "settings.ini.template"]
 
-    
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir)
+
+    config_dir = os.path.join(base_dir, "config")
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+
+    for ini_file in ini_files:
+        url = f"https://raw.githubusercontent.com/byinarie/qu1ckdr0p2/main/qu1ckdr0p2/config/{ini_file}"
+        r = requests.get(url)
+        with open(os.path.join(config_dir, ini_file), 'wb') as f:
+            f.write(r.content)
+
+    create_directories()
+
+    for folder in sparse_folders:
+        target_folder = os.path.join(base_dir, folder)
+        if not os.path.exists(target_folder):
+            os.makedirs(target_folder)
+        subprocess.run(["git", "clone", "--depth", "1", "--no-checkout", repo_base_url, target_folder])
+
+    for folder in sparse_folders:
+        subdirectory_path = f"qu1ckdr0p2/{folder}"  # Relative path to the subdirectory
+        target_subdirectory = os.path.join(base_dir, folder)  # Target local subdirectory
+
+        # Perform sparse checkout
+        subprocess.run(["git", "sparse-checkout", "set", subdirectory_path], cwd=target_subdirectory)
+
+        # Perform checkout to apply sparse checkout
+        subprocess.run(["git", "checkout"], cwd=target_subdirectory)
+
+    click.echo("Initialization complete.")
+
+def create_directories():
+    directories = ["downloads", "windows", "linux", "mac"]
+    for directory in directories:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+def resolve_absolute_path(relative_path):
+    user_home = os.path.expanduser("~")
+    base_paths = {
+        "windows": os.path.join(user_home, ".qu1ckdr0p2/windows"),
+        "linux": os.path.join(user_home, ".qu1ckdr0p2/linux"),
+        "mac": os.path.join(user_home, ".qu1ckdr0p2/mac"),
+        "config": os.path.join(user_home, ".qu1ckdr0p2/config"),
+        "certs": os.path.join(user_home, ".qu1ckdr0p2/certs"),
+        "payloads": os.path.join(user_home, ".qu1ckdr0p2/payloads")
+    }
+    for key, base_path in base_paths.items():
+        if relative_path.startswith(key):
+            return os.path.join(base_path, relative_path[len(key)+1:])
+    return relative_path
+
+
+
 if __name__ == "__main__":
     download_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads/')
     target_directory = os.path.dirname(os.path.abspath(__file__))   

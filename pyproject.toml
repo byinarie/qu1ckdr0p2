@@ -5,6 +5,10 @@ description = "Rapid file hosting."
 authors = ["byinarie <byinarie@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+include = ["qu1ckdr0p2/serv.py", "qu1ckdr0p2/config/repos.ini", "qu1ckdr0p2/config/common.ini", "qu1ckdr0p2/config/settings.ini.template"]
+exclude = ["*"]
+
+
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -13,16 +17,13 @@ flask = "2.2.5"
 netifaces = "0.11.0"
 requests = "2.31.0"
 tqdm = "4.65.0"
+pyopenssl = "^23.2.0"
 
 [tool.poetry.scripts]
-qu1ckdr0p = "qu1ckdr0p2.serv:main"
+serv = "qu1ckdr0p2.serv:cli"
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[build]
-exclude = [
-    "config/settings.ini"
-]
