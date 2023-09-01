@@ -1,8 +1,8 @@
 name: Sync Repositories
 
 on:
-  schedule:
-    - cron: '0 * * * *' # Run every hour
+  # schedule:
+  #   - cron: '0 * * * *' # Run every hour
 
 jobs:
   sync:
