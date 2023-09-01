@@ -49,4 +49,4 @@ jobs:
         git config --local user.name "GitHub Action"
         git add -A
         git commit -m "Sync SharpCollection into qu1ckdr0p2/windows: ${LATEST_COMMIT}"
-        git push origin main
+        git push origin dev
