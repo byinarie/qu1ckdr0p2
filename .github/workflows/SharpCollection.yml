@@ -12,10 +12,7 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
-        with:
-          node-version: '16'
 
       - name: Sync Windows Directory
         run: |
           cp -r ../SharpCollection/qu1ckdr0p2/windows/* qu1ckdr0p2/windows
-
