@@ -16,7 +16,7 @@ jobs:
         repository: 'byinarie/qu1ckdr0p2'
         ref: 'main'
         path: 'qu1ckdr0p2'
-        fetch-depth: 0 # Fetch all history for all branches and tags
+        fetch-depth: 0 
 
     - name: Clone SharpCollection repository
       run: git clone https://github.com/Flangvik/SharpCollection.git
