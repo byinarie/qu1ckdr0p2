@@ -4,8 +4,6 @@ on:
   push:
     paths:
       - '.github/workflows/sync-repos.yml'
-  schedule:
-    - cron: '0 * * * *' # Run every hour
 
 jobs:
   sync:
