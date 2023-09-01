@@ -1,0 +1,52 @@
+name: Sync Repositories
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout qu1ckdr0p2 repository
+      uses: actions/checkout@v2
+      with:
+        repository: 'byinarie/qu1ckdr0p2'
+        ref: 'main'
+        path: 'qu1ckdr0p2'
+        fetch-depth: 0 # Fetch all history for all branches and tags
+        token: ${{ secrets.QU1CKDR0P_UPDATE }}
+
+    - name: Clone SharpCollection repository
+      run: git clone https://github.com/Flangvik/SharpCollection.git
+
+    - name: Check for changes in SharpCollection
+      id: check_changes
+      run: |
+        cd SharpCollection
+        LATEST_COMMIT=$(git rev-parse HEAD)
+        cd ../qu1ckdr0p2/qu1ckdr0p2/windows
+        LAST_SYNCED_COMMIT=$(git log -n 1 --pretty=format:"%s" -- . | awk -F: '{print $2}')
+        if [ "$LATEST_COMMIT" != "$LAST_SYNCED_COMMIT" ]; then
+          echo "New changes detected."
+          echo "LATEST_COMMIT=$LATEST_COMMIT" >> $GITHUB_ENV
+          echo "LAST_SYNCED_COMMIT=$LAST_SYNCED_COMMIT" >> $GITHUB_ENV
+          echo "changes_detected=true" >> $GITHUB_ENV
+        else
+          echo "No new changes detected."
+          echo "changes_detected=false" >> $GITHUB_ENV
+        fi
+
+    - name: Rsync repositories
+      if: env.changes_detected == 'true'
+      run: rsync -a SharpCollection/ qu1ckdr0p2/qu1ckdr0p2/windows/
+
+    - name: Commit and push changes
+      if: env.changes_detected == 'true'
+      run: |
+        cd qu1ckdr0p2
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git commit -m "Sync SharpCollection into qu1ckdr0p2/windows: ${LATEST_COMMIT}"
+        git push origin main
