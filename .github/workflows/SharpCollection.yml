@@ -15,7 +15,7 @@ jobs:
         ref: 'main'
         path: 'qu1ckdr0p2'
         fetch-depth: 0 # Fetch all history for all branches and tags
-        token: ${{ secrets.QU1CKDR0P_TOKEN }}
+        token: ${{ secrets.QU1CKDR0P_UPDATE }}
 
     - name: Clone SharpCollection repository
       run: git clone https://github.com/Flangvik/SharpCollection.git
