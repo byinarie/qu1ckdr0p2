@@ -1,6 +1,6 @@
 name: Sync Repositories
 
-on:
+# on:
   # schedule:
   #   - cron: '0 * * * *' # Run every hour
 
