@@ -4,20 +4,21 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'qu1ckdr0p2/windows/**'
 
 jobs:
   sync:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+      - name: Checkout Source Repository
+        run: git clone https://github.com/Flangvik/SharpCollection.git SharpCollection
 
-      - name: Sync Windows Directory
-        if: startsWith(github.repository, 'byinarie/') && github.event_path == 'qu1ckdr0p2/windows'
+      - name: Sync Windows Directories
+        if: github.repository == 'Flangvik/SharpCollection' && github.event_path == 'SharpCollection'
         run: |
-          mkdir -p qu1ckdr0p2/windows
-          curl -L -o temp.zip https://github.com/Flangvik/SharpCollection/archive/refs/heads/main.zip
-          unzip -o temp.zip -d temp
-          rsync -r temp/SharpCollection-main/qu1ckdr0p2/windows/ qu1ckdr0p2/windows/
-          rm -r temp temp.zip
+          rsync -a SharpCollection qu1ckdr0p2/windows/
+          
+      - name: Cleanup
+        run: rm -rf temp
