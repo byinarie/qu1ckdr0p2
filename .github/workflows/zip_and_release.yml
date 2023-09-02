@@ -1,0 +1,47 @@
+name: Zip and Release
+
+on:
+  push:
+    paths:
+      - 'windows/**'
+      - 'mac/**'
+      - 'linux/**'
+    branches:
+      - dev
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install zip
+        run: sudo apt-get install zip
+
+      - name: Zip directories
+        run: |
+          zip -r windows.zip windows/
+          zip -r mac.zip mac/
+          zip -r linux.zip linux/
+
+      - name: Create GitHub release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: Auto-generated release
+        env:
+          GITHUB_TOKEN: ${{ secrets.QU1CKDR0P_UPDATE }}
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./windows.zip
+          asset_name: windows.zip
+          asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.QU1CKDR0P_UPDATE }}
