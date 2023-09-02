@@ -243,7 +243,6 @@ def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update
         full_path = os.path.join(base_dir, dir_name)
         create_directory(full_path)
     
-    
     headers = {'Authorization': f'token {api_key}'} if api_key else None
     handle_github_auth(api_key)
     
@@ -256,7 +255,6 @@ def create_directory(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
         click.echo(click.style(f"[+] Created directory: {dir_path}", fg='green'))
-
 
 def handle_github_auth(api_key):
     if api_key:
