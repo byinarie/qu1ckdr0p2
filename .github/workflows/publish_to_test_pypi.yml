@@ -5,9 +5,7 @@ on:
     branches:
       - dev
     paths:
-      - 'mac/**'
-      - 'windows/**'
-      - 'linux/**'
+      - 'qu1ckdr0p2/**/**/**'
 
 jobs:
   build:
@@ -33,5 +31,3 @@ jobs:
       run: poetry publish --repository testpypi
       env:
         POETRY_PYPI_TOKEN_TEST_PYPI: ${{ secrets.PUBLISH_TO_TEST_PYPI }}
-
-    # Additional steps to zip the directories and create GitHub releases can be added here.
