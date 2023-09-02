@@ -223,14 +223,15 @@ def display_aliases(search=None):
 @click.option('--skip-mac', is_flag=True, help='Skip checking the mac directory.')
 @click.option('--api-key', help='Github API key for authentication')
 @click.option('--update-self', is_flag=True, help='Update the tool using pip.')
-def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update_self):
+@click.option('--update-self-test', is_flag=True, help='Used for dev testing, installs unstable build.')
+def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update_self, update_self_test):
     """Download missing files, and update outdated files."""
-    
     if update_self:
-        update_self_function()
-        return
-    """Download missing files, and update outdated files."""
-    create_directory(base_dir)
+        subprocess.run(["pip", "install", "--upgrade", "your-package-name"])
+    elif update_self_test:
+        subprocess.run(["pip", "install", "--index-url", "https://test.pypi.org/simple/", "--upgrade", "your-package-name-test"])
+    else:
+        create_directory(base_dir)
     
     skip_directories = []
     if skip_config: skip_directories.append("config")
