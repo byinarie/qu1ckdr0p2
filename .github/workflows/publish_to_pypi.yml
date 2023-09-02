@@ -1,0 +1,30 @@
+name: Publish to PyPI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Publish to Test PyPI (Dev branch)
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          poetry config pypi-token.test ${{ secrets.PUBLISH_TO_TEST_PYPI }}
+          poetry publish --repository test
+
+      - name: Publish to PyPI (Main branch)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          poetry config pypi-token.pypi ${{ secrets.PUBLISH_TO_PYPI }}
+          poetry publish
