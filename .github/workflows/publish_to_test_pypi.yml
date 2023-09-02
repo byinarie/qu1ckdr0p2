@@ -8,6 +8,7 @@ on:
       - 'qu1ckdr0p2/qu1ckdr0p2/serv.py'
       - 'pyproject.toml'
       - 'poetry.lock'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -36,3 +37,10 @@ jobs:
       run: poetry publish --repository testpypi
       env:
         POETRY_PYPI_TOKEN_TEST_PYPI: ${{ secrets.PUBLISH_TO_TEST_PYPI }}
+
+        
+    - name: Debug Token Length
+      run: echo "Token length is ${#POETRY_PYPI_TOKEN_TEST_PYPI}"
+      env:
+        POETRY_PYPI_TOKEN_TEST_PYPI: ${{ secrets.PUBLISH_TO_TEST_PYPI }}
+        
