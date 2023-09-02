@@ -318,7 +318,7 @@ def list_local_files(directory_path):
 
 def update_self_function():
     try:
-        subprocess.run(['pip', 'install', '--upgrade', 'your-tool-name'], check=True)
+        subprocess.run(['pip', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
         click.echo(click.style("[+] Successfully updated the tool.", fg='green'))
     except subprocess.CalledProcessError as e:
         click.echo(click.style(f"[-] Failed to update the tool: {e}", fg='red'))
