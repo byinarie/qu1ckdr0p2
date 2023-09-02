@@ -1,0 +1,37 @@
+name: Publish to Test PyPI
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'mac/**'
+      - 'windows/**'
+      - 'linux/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    
+    - name: Install dependencies
+      run: |
+        pip install poetry
+    
+    - name: Build package
+      run: poetry build
+
+    - name: Publish package to Test PyPI
+      run: poetry publish --repository testpypi
+      env:
+        POETRY_PYPI_TOKEN_TEST_PYPI: ${{ secrets.PUBLISH_TO_TEST_PYPI }}
+
+    # Additional steps to zip the directories and create GitHub releases can be added here.
