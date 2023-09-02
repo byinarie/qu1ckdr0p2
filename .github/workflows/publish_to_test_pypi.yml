@@ -5,7 +5,9 @@ on:
     branches:
       - dev
     paths:
-      - 'qu1ckdr0p2/**/**/**'
+      - 'qu1ckdr0p2/qu1ckdr0p2/serv.py'
+      - 'pyproject.toml'
+      - 'poetry.lock'
 
 jobs:
   build:

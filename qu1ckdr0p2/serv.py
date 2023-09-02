@@ -33,9 +33,6 @@ key_path = os.path.join(cert_dir, 'key.pem')
 config = configparser.ConfigParser()
 common_ini_path = os.path.join(base_dir, 'config/common.ini')
 config.read(common_ini_path)
-# print(config.sections())
-# print(config.items("._DIR"))
-# Not sorting out other platforms for now
 @click.group()
 def cli():
     pass
