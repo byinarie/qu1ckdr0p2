@@ -10,7 +10,6 @@ import configparser
 import requests
 import logging
 import subprocess
-
 from concurrent.futures import ThreadPoolExecutor
 
 log = logging.getLogger('werkzeug')
@@ -130,7 +129,10 @@ def generate_self_signed_cert(cert_dir):
         with open(key_path, 'wb') as key_file:
             key_file.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
 
-        click.echo(click.style(f"[+] Certificate and key generated at {cert_path} and {key_path}", fg='green'))
+            click.echo(click.style(f"[+] ", fg='green') + click.style(f"Certificate and key generated at: ", fg='yellow') + click.style(f"{cert_dir}\n", fg='blue'))
+            click.echo(click.style(f"[>] ", fg='green') + click.style(f"Certificate: ", fg='yellow') + click.style(f"{cert_path}", fg='blue'))
+            click.echo(click.style(f"[>] ", fg='green') + click.style(f"Key: ", fg='yellow') + click.style(f"{key_path}\n", fg='blue'))
+
 
     return cert_path, key_path
 
@@ -140,6 +142,8 @@ def serve_files(path_to_serve, https=True, port=443, ssl_context=None):
     app = Flask(__name__)
 
     if os.path.isdir(path_to_serve):
+        click.echo(click.style(f"[+] Using certificate: {cert_path}", fg='green'))
+        click.echo(click.style(f"[+] Using key: {key_path}", fg='green'))
         click.echo(f"Serving at {protocol}://{ip_address}:{port}/")
         for filename in os.listdir(path_to_serve):
             click.echo(f"{protocol}://{ip_address}:{port}/{filename}")
@@ -261,8 +265,9 @@ def handle_github_auth(api_key):
         click.echo(click.style(f"[+] Using Github API key for authentication", fg='green'))
     else:
         click.echo(click.style(f"[-] No Github API key provided, using unauthenticated requests", fg='yellow'))
-        click.echo(click.style(f"[-] Unauthenticated requests are subject to higher limiting", fg='yellow')) 
+        click.echo(click.style(f"[-] Unauthenticated requests are subject to higher limiting: 60/hr.", fg='yellow')) 
         click.echo(click.style(f"[-] You can create a token here: https://github.com/settings/tokens/new", fg='yellow'))
+        click.echo(click.style(f"[-] Running init --check or similar will faill without a token.", fg='yellow'))
 
 def handle_directory(directory, headers, check):
     target_path = os.path.join(base_dir, directory)
