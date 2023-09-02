@@ -61,8 +61,11 @@ def get_serving_ip():
 @click.option('-f', '--file', type=click.Path(exists=True, dir_okay=False),help="Serve a file")
 @click.option('--https', type=click.STRING, metavar='HTTPS PORT', default=None, help="Use HTTPS with a custom port")
 @click.option('--http', type=click.STRING, metavar='HTTPS PORT', default=None, help="Use HTTP with a custom port")
-def serve(search, list_flag, use, directory, file, https, http):
+def serve(search, list_flag, use, directory, file, https, http, cert_path=cert_path, key_path=key_path):
     """Serve a file over HTTP or HTTPS."""
+    generate_self_signed_cert(cert_dir)
+    ssl_context = None
+
     if list_flag:
         if use:
             invoke_serve_by_number(search, use, https=https is not None, port=int(https) if https else 443)
@@ -103,38 +106,7 @@ def serve(search, list_flag, use, directory, file, https, http):
             os.makedirs(cert_dir)
         cert_path, key_path = generate_self_signed_cert(cert_dir)
         ssl_context = (cert_path, key_path)
-
-def generate_self_signed_cert(cert_dir):
-    if not os.path.exists(cert_path) or not os.path.exists(key_path):
-        key = crypto.PKey()
-        key.generate_key(crypto.TYPE_RSA, 2048)
-
-        cert = crypto.X509()
-        cert.get_subject().C = "US"
-        cert.get_subject().ST = "CA"
-        cert.get_subject().L = "San Francisco"
-        cert.get_subject().O = "qu1ckdr0p2"
-        cert.get_subject().OU = "qu1ckdr0p2"
-        cert.get_subject().CN = "byinarie@deadcell.dev"
-        cert.set_serial_number(1000)
-        cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(315360000)  # Valid for 10 years
-        cert.set_issuer(cert.get_subject())
-        cert.set_pubkey(key)
-        cert.sign(key, 'sha256')
-
-        with open(cert_path, 'wb') as cert_file:
-            cert_file.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
-
-        with open(key_path, 'wb') as key_file:
-            key_file.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
-
-            click.echo(click.style(f"[+] ", fg='green') + click.style(f"Certificate and key generated at: ", fg='yellow') + click.style(f"{cert_dir}\n", fg='blue'))
-            click.echo(click.style(f"[>] ", fg='green') + click.style(f"Certificate: ", fg='yellow') + click.style(f"{cert_path}", fg='blue'))
-            click.echo(click.style(f"[>] ", fg='green') + click.style(f"Key: ", fg='yellow') + click.style(f"{key_path}\n", fg='blue'))
-
-
-    return cert_path, key_path
+        
 
 def serve_files(path_to_serve, https=True, port=443, ssl_context=None):
     ip_address = get_serving_ip()
@@ -142,14 +114,14 @@ def serve_files(path_to_serve, https=True, port=443, ssl_context=None):
     app = Flask(__name__)
 
     if os.path.isdir(path_to_serve):
-        click.echo(click.style(f"[+] Using certificate: {cert_path}", fg='green'))
-        click.echo(click.style(f"[+] Using key: {key_path}", fg='green'))
-        click.echo(f"Serving at {protocol}://{ip_address}:{port}/")
         for filename in os.listdir(path_to_serve):
-            click.echo(f"{protocol}://{ip_address}:{port}/{filename}")
+            click.echo(click.style(f"{protocol}://{ip_address}:{port}/", fg='yellow') + click.style(f"{filename}", fg='blue'))
     else:
         filename = os.path.basename(path_to_serve)
-        click.echo(f"Serving at {protocol}://{ip_address}:{port}/{filename}")
+        click.echo(click.style(f"[+] ", fg='green') + click.style(f"Using certificate from:", fg='yellow') + click.style(f" {cert_path}", fg='blue'))
+        click.echo(click.style(f"[+] ", fg='green') + click.style(f"Using key from:", fg='yellow') + click.style(f" {key_path}", fg='blue'))
+        click.echo(click.style(f"[+] ", fg='green') + click.style(f"Sending directory:", fg='yellow') + click.style(f" {path_to_serve}", fg='blue'))
+        click.echo(click.style(f"[+] ", fg='green') + click.style(f"\nDirecory listing:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}", fg='blue'))
 
     @app.route('/<path:filename>')
     def serve_directory(filename):
@@ -162,6 +134,40 @@ def serve_files(path_to_serve, https=True, port=443, ssl_context=None):
         return "File not found", 404
 
     app.run(host='0.0.0.0', port=port, ssl_context=ssl_context)
+    
+def generate_self_signed_cert(cert_dir):
+    if not os.path.exists(cert_dir):
+        os.makedirs(cert_dir)
+
+    cert_path = os.path.join(cert_dir, 'cert.pem')
+    key_path = os.path.join(cert_dir, 'key.pem')
+    
+    if not os.path.exists(cert_path) or not os.path.exists(key_path):
+        key = crypto.PKey()
+        key.generate_key(crypto.TYPE_RSA, 2048)
+        
+        cert = crypto.X509()
+        cert.get_subject().C = "US"
+        cert.get_subject().ST = "CA"
+        cert.get_subject().L = "San Francisco"
+        cert.get_subject().O = "qu1ckdr0p2"
+        cert.get_subject().OU = "qu1ckdr0p2"
+        cert.get_subject().CN = "localhost"
+        cert.set_serial_number(1000)
+        cert.gmtime_adj_notBefore(0)
+        cert.gmtime_adj_notAfter(315360000)
+        cert.set_issuer(cert.get_subject())
+        cert.set_pubkey(key)
+        cert.sign(key, 'sha256')
+        
+        with open(cert_path, 'wb') as cert_file:
+            cert_file.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+        
+        with open(key_path, 'wb') as key_file:
+            key_file.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
+    
+    return cert_path, key_path
+
 
 def list_aliases(search, use, port):
     if use:
@@ -172,35 +178,47 @@ def list_aliases(search, use, port):
 def invoke_serve_by_number(search=None, use=None, https=True, port=443):
     counter = 1
     selected_alias = None
+
     for section in config.sections():
         for key, value in config.items(section):
             alias_name = key
             alias_path = os.path.join(base_dir, value)
+            
             if search:
                 search_lower = search.lower()
-                if not (search_lower in alias_name.lower() or search_lower in alias_path.lower()):
+                alias_name_lower = alias_name.lower()
+                if not (search_lower in alias_name_lower or search_lower in alias_path.lower()):
                     continue
+            
+            # Check if counter matches 'use' and if so, store the alias and break
             if counter == use:
                 selected_alias = alias_name
+                
+                # Exit both loops
                 break
             counter += 1
+
+        # If selected_alias is set, break out of the outer loop
+        if selected_alias:
+            break
+
     if selected_alias:
-        dir_section = None
         for section in config.sections():
-            if selected_alias in config[section]:
-                dir_section = section
-                break
-        if dir_section:
-            relative_path = config.get(dir_section, selected_alias, fallback=None)
-            path_to_serve = os.path.join(base_dir, relative_path)
-        else:
-            click.echo(f"Alias '{selected_alias}' not found in config/common.ini.")
-            return
-        serve_files(path_to_serve, port=port)
-
-
+            for key, value in config.items(section):
+                if key.lower() == selected_alias.lower():  # Match case-insensitively
+                    path_to_serve = os.path.join(base_dir, value)
+                    
+                    # Check if the path actually exists
+                    if not os.path.exists(path_to_serve):
+                        click.echo(f"Path '{path_to_serve}' does not exist.")
+                        return
+                    
+                    serve_files(path_to_serve, port=port)
+                    return
+        click.echo(f"Alias '{selected_alias}' not found in config/common.ini.")
     else:
         click.echo(f"No alias found for the number {use}.")
+
 
 def display_aliases(search=None):
     counter = 1
