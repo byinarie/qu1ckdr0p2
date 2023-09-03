@@ -1,5 +1,6 @@
 import hashlib
 from flask import Flask, send_from_directory
+from flask import render_template_string
 from tqdm import tqdm
 from OpenSSL import crypto
 import os
@@ -8,10 +9,9 @@ import logging
 import click
 import configparser
 import requests
-import logging
 import subprocess
-from concurrent.futures import ThreadPoolExecutor
 
+app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
@@ -27,16 +27,18 @@ cert_dir = os.path.join(user_home, ".qu1ckdr0p2", 'certs')
 
 cert_path = os.path.join(cert_dir, 'cert.pem')
 key_path = os.path.join(cert_dir, 'key.pem')
-
+cert = "cert.pem"
+privkey = "key.pem"
 
 config = configparser.ConfigParser()
 common_ini_path = os.path.join(base_dir, 'config/common.ini')
+config = configparser.ConfigParser()
 config.read(common_ini_path)
-@click.group()
-def cli():
-    pass
-
-          
+aliases = {}
+for section in config.sections():
+    for key, value in config.items(section):
+        aliases[key.lower()] = os.path.join(base_dir, value)
+                
 def get_interface_ip(interface):
     try:
         ip = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
@@ -45,96 +47,15 @@ def get_interface_ip(interface):
         return None
 
 def get_serving_ip():
-    tun0_ip = get_interface_ip('tun0')
-    if tun0_ip:
-        return tun0_ip
-    eth0_ip = get_interface_ip('eth0')
-    if eth0_ip:
-        return eth0_ip
-    return '0.0.0.0'
+    interfaces = ['tun0', 'eth0']
+    for interface in interfaces:
+        try:
+            ip = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
+            return ip, interface
+        except Exception as e:
+            continue
+    return '0.0.0.0', 'None'
 
-@cli.command()
-@click.option('--list', 'list_flag', is_flag=True, help="List aliases")
-@click.option('--search', type=str, required=False, metavar='TOOL', help="Search query for aliases")
-@click.option('-u', '--use', metavar='TOOL USE NUMBER', type=int, help="Use an alias by a dynamic number")
-@click.option('-d', '--directory', type=click.Path(exists=True, file_okay=False),help="Serve a directory")
-@click.option('-f', '--file', type=click.Path(exists=True, dir_okay=False),help="Serve a file")
-@click.option('--https', type=click.STRING, metavar='HTTPS PORT', default=None, help="Use HTTPS with a custom port")
-@click.option('--http', type=click.STRING, metavar='HTTPS PORT', default=None, help="Use HTTP with a custom port")
-def serve(search, list_flag, use, directory, file, https, http, cert_path=cert_path, key_path=key_path):
-    """Serve a file over HTTP or HTTPS."""
-    generate_self_signed_cert(cert_dir)
-    ssl_context = None
-
-    if list_flag:
-        if use:
-            invoke_serve_by_number(search, use, https=https is not None, port=int(https) if https else 443)
-        else:
-            display_aliases(search)
-        return
-
-    if use and not search:
-        click.echo("The --use option requires --search to be specified.")
-        return
-
-    if use and search:
-        alias = f"{search}{use}"
-
-    if directory and file:
-        click.echo("Please provide either a directory path or a file path, not both.")
-        return
-
-    if https:
-        if https.isnumeric():
-            port = int(https)
-        else:
-            click.echo("--https should either be a flag or followed by a port number.")
-            return
-        if not os.path.exists(cert_dir):
-            os.makedirs(cert_dir)
-        cert_path, key_path = generate_self_signed_cert(cert_dir)
-        ssl_context = (cert_path, key_path)
-    elif http:
-        if http.isnumeric():
-            port = int(http)
-        else:
-            click.echo("--http should either be a flag or followed by a port number.")
-            return
-    else:
-        port = 443
-        if not os.path.exists(cert_dir):
-            os.makedirs(cert_dir)
-        cert_path, key_path = generate_self_signed_cert(cert_dir)
-        ssl_context = (cert_path, key_path)
-        
-
-def serve_files(path_to_serve, https=True, port=443, ssl_context=None):
-    ip_address = get_serving_ip()
-    protocol = 'https' if https else 'http'
-    app = Flask(__name__)
-
-    if os.path.isdir(path_to_serve):
-        for filename in os.listdir(path_to_serve):
-            click.echo(click.style(f"{protocol}://{ip_address}:{port}/", fg='yellow') + click.style(f"{filename}", fg='blue'))
-    else:
-        filename = os.path.basename(path_to_serve)
-        click.echo(click.style(f"[+] ", fg='green') + click.style(f"Using certificate from:", fg='yellow') + click.style(f" {cert_path}", fg='blue'))
-        click.echo(click.style(f"[+] ", fg='green') + click.style(f"Using key from:", fg='yellow') + click.style(f" {key_path}", fg='blue'))
-        click.echo(click.style(f"[+] ", fg='green') + click.style(f"Sending directory:", fg='yellow') + click.style(f" {path_to_serve}", fg='blue'))
-        click.echo(click.style(f"[+] ", fg='green') + click.style(f"\nDirecory listing:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}", fg='blue'))
-
-    @app.route('/<path:filename>')
-    def serve_directory(filename):
-        if os.path.isdir(path_to_serve):
-            full_path = os.path.join(path_to_serve, filename)
-        else:
-            full_path = path_to_serve if filename == os.path.basename(path_to_serve) else None
-        if full_path and os.path.exists(full_path):
-            return send_from_directory(os.path.dirname(full_path), os.path.basename(full_path))
-        return "File not found", 404
-
-    app.run(host='0.0.0.0', port=port, ssl_context=ssl_context)
-    
 def generate_self_signed_cert(cert_dir):
     if not os.path.exists(cert_dir):
         os.makedirs(cert_dir)
@@ -168,72 +89,282 @@ def generate_self_signed_cert(cert_dir):
     
     return cert_path, key_path
 
-
 def list_aliases(search, use, port):
     if use:
         invoke_serve_by_number(search, use, port=port)
     else:
         display_aliases(search)
 
-def invoke_serve_by_number(search=None, use=None, https=True, port=443):
-    counter = 1
-    selected_alias = None
-
-    for section in config.sections():
-        for key, value in config.items(section):
-            alias_name = key
-            alias_path = os.path.join(base_dir, value)
-            
-            if search:
-                search_lower = search.lower()
-                alias_name_lower = alias_name.lower()
-                if not (search_lower in alias_name_lower or search_lower in alias_path.lower()):
-                    continue
-            
-            # Check if counter matches 'use' and if so, store the alias and break
-            if counter == use:
-                selected_alias = alias_name
-                
-                # Exit both loops
-                break
-            counter += 1
-
-        # If selected_alias is set, break out of the outer loop
-        if selected_alias:
-            break
-
-    if selected_alias:
-        for section in config.sections():
-            for key, value in config.items(section):
-                if key.lower() == selected_alias.lower():  # Match case-insensitively
-                    path_to_serve = os.path.join(base_dir, value)
-                    
-                    # Check if the path actually exists
-                    if not os.path.exists(path_to_serve):
-                        click.echo(f"Path '{path_to_serve}' does not exist.")
-                        return
-                    
-                    serve_files(path_to_serve, port=port)
-                    return
-        click.echo(f"Alias '{selected_alias}' not found in config/common.ini.")
-    else:
-        click.echo(f"No alias found for the number {use}.")
-
-
 def display_aliases(search=None):
     counter = 1
+    for alias, path in aliases.items():
+        if search:
+            search_lower = search.lower()
+            if not (search_lower in alias.lower() or search_lower in path.lower()):
+                continue
+
+        display_path = path.replace(os.path.expanduser("~"), "~")        
+        click.echo(click.style(f"\n[→] ", fg='green') + click.style("Path: ", fg='yellow') + click.style(f"{display_path}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style(f"Alias: ", fg='yellow') + click.style(f"{alias}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Use: ", fg='yellow') + click.style(f"{counter}", fg='blue'))
+        counter += 1
+
+          
+def load_config(file_path):
+    config = configparser.ConfigParser()
+    config.read(file_path)
+    aliases = {}
     for section in config.sections():
         for key, value in config.items(section):
-            alias_name = key
-            alias_path = os.path.join(base_dir, value)
-            if search:
-                search_lower = search.lower()
-                if not (search_lower in alias_name.lower() or search_lower in alias_path.lower()):
-                    continue
-            click.echo(f"Alias: {alias_name}\nPath: {alias_path}\nuse: {counter}^\n-> -u {alias_name}\n")
-            counter += 1
+            aliases[key.lower()] = os.path.join(base_dir, value)
+    return aliases
 
-                       
+def print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert=None, privkey=None):
+    relative_path = os.path.relpath(path_to_serve, start=base_dir)  
+    
+    click.echo(click.style(f"\n[→] ", fg='green') + click.style("Serving:", fg='yellow') + click.style(f" {relative_path}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Protocol:", fg='yellow') + click.style(f" {protocol}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("IP address:", fg='yellow') + click.style(f" {ip_address}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Port:", fg='yellow') + click.style(f" {port}", fg='blue'))    
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Interface:", fg='yellow') + click.style(f" {interface_name}", fg='blue'))
+    if cert and privkey:
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Using cert:", fg='yellow') + click.style(f" {cert}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Using key:", fg='yellow') + click.style(f" {privkey}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("CTRL+C to quit\n", fg='yellow'))
+    click.echo(click.style(f"\n[→] ", fg='green') + click.style("URL:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}\n\n", fg='blue'))
+    
+def serve_files(path_to_serve, http_port=80, https_port=443):
+    if os.path.isdir(path_to_serve):
+        @app.route('/')
+        def index():
+            files = os.listdir(path_to_serve)
+            file_links = [f'<a href="/{file}">{file}</a><br>' for file in files]
+            return '\n'.join(file_links)
+        
+        @app.route('/<path:filename>')
+        def serve_file(filename):
+            return send_from_directory(path_to_serve, filename)
+        
+        filename = os.path.basename(path_to_serve)
+    else:
+        directory, filename = os.path.split(path_to_serve)
+        
+        @app.route('/')
+        def index():
+            return f'<a href="/{filename}">-> {filename}</a>'
+        
+        @app.route(f'/{filename}')
+        def serve_file():
+            return send_from_directory(directory, filename)
+
+    protocol = "http" if http_port else "https"
+    ip_address, interface_name = get_serving_ip()
+    port = http_port or https_port
+    protocol = "http" if http_port else "https"
+    
+    cert_path, key_path = None, None
+    if https_port:
+        cert_path, key_path = generate_self_signed_cert(cert_dir)
+        
+    print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert_path, key_path)
+    
+    if http_port:
+        app.run(host='0.0.0.0', port=http_port)
+    elif https_port:
+        cert_path, key_path = generate_self_signed_cert(cert_dir)
+        if cert_path and key_path:
+            app.run(host='0.0.0.0', port=https_port, ssl_context=(cert_path, key_path))
+        else:
+            click.echo(click.style(f"\n[!] ", fg='red') + click.style("Could not generate or find SSL certificates.\n", fg='yellow'))
+
+def invoke_serve_by_number(search=None, use=None, http=None, https=None):
+    search_results = {alias: path for alias, path in aliases.items() if search.lower() in alias.lower() or search.lower() in path.lower()}
+    if use > len(search_results) or use < 1:
+        click.echo(click.style(f"\n[!] ", fg='red') + click.style("The number provided with --use is out of range.\n", fg='yellow'))
+        return
+    
+    selected_alias = list(search_results.keys())[use - 1]
+    selected_path = search_results[selected_alias]
+    
+    # Default to HTTPS on port 443 if no port is specified
+    if not http and not https:
+        https = 443
+    
+    serve_files(selected_path, http, https)
+    
+    selected_alias = list(search_results.keys())[use - 1]
+    selected_path = search_results[selected_alias]
+    serve_files(selected_path, http, https)
+
+@click.group()
+@click.option('--debug', is_flag=True, help='Enable debug mode.')
+@click.pass_context
+def cli(ctx, debug):
+    """Welcome to qu1ckdr0p2 entry point."""
+    ctx.ensure_object(dict)
+    ctx.obj['DEBUG'] = debug
+    
+    if debug:
+        log.setLevel(logging.DEBUG)
+        app.debug = True
+        logging.basicConfig(level=logging.DEBUG)
+        click.echo(click.style('[!] ', fg='red') + click.style('Debug mode enabled', fg='red', blink=True, bold=True))
+          
+@cli.command(context_settings={"help_option_names": ['-h', '--help']})
+@click.option('-l', '--list', 'list_flag', is_flag=True, help="List aliases")
+@click.option('-s', '--search', type=str, required=False, help="Search query for aliases")
+@click.option('-u', '--use', type=int, required=False, help="Use an alias by a dynamic number")
+@click.option('-d', '--directory', type=click.Path(exists=True, file_okay=False), help="Serve a directory")
+@click.option('-f', '--file', type=click.Path(exists=True, dir_okay=False), help="Serve a file")
+@click.option('--http', type=int, default=None, help="Use HTTP with a custom port")
+@click.option('--https', type=int, default=None, help="Use HTTPS with a custom port")
+@click.pass_context
+def serve(ctx, list_flag, search, use, directory, file, http, https):
+    """Serve files."""          
+    if not any([list_flag, search, use, directory, file, http, https]):
+        print("No options provided. Displaying help:")
+        click.echo(ctx.get_help())
+        return
+        
+    if list_flag:
+        list_aliases(None, None, None)
+        return
+
+    if search:
+        if use is not None:
+            invoke_serve_by_number(search, use, http, https)
+        else:
+            list_aliases(search, None, None)
+        return
+
+    if use is not None:
+        click.echo(click.style(f"\n[!] ", fg='red') + click.style("You must provide a search term along with --use.\n", fg='yellow'))
+        return
+
+    if directory:
+        if not http and not https:
+            https = 443  
+        serve_files(directory, http, https)
+        return
+
+    if file:
+        if not http and not https:
+            https = 443  
+        serve_files(file, http, https)
+        return
+
+def create_directory(dir_path):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Created directory:", fg='yellow') + click.style(f" {dir_path}", fg='blue'))
+
+def handle_github_auth(api_key):
+    if api_key:
+        click.echo(click.style(f"[→] Using Github API key for authentication", fg='green'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Using Github API key for authentication", fg='yellow'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Github API key:", fg='yellow') + click.style(f" {api_key}", fg='blue'))
+    else:
+        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
+        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
+        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
+        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
+
+def handle_directory(directory, headers, check):
+    target_path = os.path.join(base_dir, directory)
+    target_url = f"https://api.github.com/repos/byinarie/qu1ckdr0p2/contents/qu1ckdr0p2/{directory}"
+            
+    response = requests.get(target_url, headers=headers)
+    if response.status_code != 200:
+        click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to fetch directory contents", fg='yellow') + click.style(f" {target_url}", fg='blue') + click.style(f" Status Code: {response.status_code}, Reason: {response.reason}", fg='yellow'))
+        return
+
+    files = response.json()
+    local_files = list_local_files(target_path)
+    
+    for file_info in files:
+        if file_info['type'] != 'file':
+            continue
+        file_name = file_info['name']
+        file_url = file_info.get('download_url')
+        if not file_url:
+            click.echo(click.style(f"[-] ", fg='red') + click.style("Download URL not found", fg='yellow') + click.style(f" {file_name}\n\n", fg='blue'))
+            continue
+        file_path = os.path.join(target_path, file_name)
+        if check:
+            if file_name not in local_files:
+                download_and_save_file(file_url, file_path)
+            else:
+                with open(file_path, 'rb') as f:
+                    existing_content = f.read()
+                existing_sha1 = calculate_git_blob_sha1(existing_content)
+                expected_sha1 = file_info.get('sha')
+                if existing_sha1 != expected_sha1:
+                    download_and_save_file(file_url, file_path)
+                    click.echo(click.style(f"[→] ", fg='green') + click.style("Updated: ", fg='yellow') + click.style(f" {file_url}\n\n", fg='blue'))
+        else:
+            download_and_save_file(file_url, file_path)
+                
+def download_and_save_file(url, file_path):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+            click.echo(click.style(f"[→] ", fg='green') + click.style("Downloaded", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
+    else:
+        click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to download", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
+
+def calculate_git_blob_sha1(data):
+    content_length = len(data)
+    return hashlib.sha1(f'blob {content_length}\0'.encode() + data).hexdigest()
+
+def list_local_files(directory_path):
+    return set(os.listdir(directory_path))
+
+def update_self_function():
+    try:
+        subprocess.run(['pip', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
+    except subprocess.CalledProcessError as e:
+        click.echo(click.style(f"[→] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
+
+def example():
+    examples = [
+        {
+            "command": "serve --search seatbelt",
+            "description": "Searches for aliases containing the word 'seatbelt'."
+        },
+        {
+            "command": "serve --search seatbelt -u ",
+            "description": "Searches for aliases containing the word 'seatbelt'."
+        },
+        {
+            "command": "serve --search seatbelt -u 3",
+            "description": "Uses the 3rd alias from the search results for 'seatbelt'."
+        },
+        {
+            "command": "serve [-f, -d, --search --https 9000",
+            "description": "Serves using HTTPS on port 9000."
+        },
+        {
+            "command": "serve --http 8000",
+            "description": "Serves using HTTP on port 8000."
+        },
+        {
+            "command": "serve -d /path/to/directory",
+            "description": "Serves a directory located at '/path/to/directory'."
+        },
+        {
+            "command": "serve -f /path/to/file",
+            "description": "Serves a file located at '/path/to/file'."
+        }
+    ]
+    
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Examples:\n", fg='green'))
+    for example in examples:
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Command:\n  {example['command']}", fg='green'))
+        click.echo(click.style(f"[→] Description:\n  {example['description']}", fg='yellow'))
+        click.echo(click.style(f"'-' * 50", fg='yellow'))
+        
 @cli.command()
 @click.option('--check', is_flag=True, help='Check and download missing or outdated files.')
 @click.option('--skip-config', is_flag=True, help='Skip checking the config directory.')
@@ -244,11 +375,11 @@ def display_aliases(search=None):
 @click.option('--update-self', is_flag=True, help='Update the tool using pip.')
 @click.option('--update-self-test', is_flag=True, help='Used for dev testing, installs unstable build.')
 def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update_self, update_self_test):
-    """Download missing files, and update outdated files."""
+    """Configure or update."""
     if update_self:
         subprocess.run(["pip", "install", "--upgrade", "your-package-name"])
     elif update_self_test:
-        subprocess.run(["pip", "install", "--index-url", "https://test.pypi.org/simple/", "--upgrade", "your-package-name-test"])
+        subprocess.run(["pip", "install", "--index-url", "https://test.pypi.org/legacy/", "--upgrade", "your-package-name-test"])
     else:
         create_directory(base_dir)
     
@@ -272,118 +403,7 @@ def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update
         if directory in skip_directories:
             continue
         handle_directory(directory, headers, check)
-
-def create_directory(dir_path):
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-        click.echo(click.style(f"[+] Created directory: {dir_path}", fg='green'))
-
-def handle_github_auth(api_key):
-    if api_key:
-        click.echo(click.style(f"[+] Using Github API key for authentication", fg='green'))
-    else:
-        click.echo(click.style(f"[-] No Github API key provided, using unauthenticated requests", fg='yellow'))
-        click.echo(click.style(f"[-] Unauthenticated requests are subject to higher limiting: 60/hr.", fg='yellow')) 
-        click.echo(click.style(f"[-] You can create a token here: https://github.com/settings/tokens/new", fg='yellow'))
-        click.echo(click.style(f"[-] Running init --check or similar will faill without a token.", fg='yellow'))
-
-def handle_directory(directory, headers, check):
-    target_path = os.path.join(base_dir, directory)
-    target_url = f"https://api.github.com/repos/byinarie/qu1ckdr0p2/contents/qu1ckdr0p2/{directory}"
-            
-    response = requests.get(target_url, headers=headers)
-    if response.status_code != 200:
-        click.echo(click.style(f"[-] Failed to fetch directory contents: {target_url}. Status Code: {response.status_code}, Reason: {response.reason}", fg='red'))
-        return
-
-    files = response.json()
-    local_files = list_local_files(target_path)
-    
-    for file_info in files:
-        if file_info['type'] != 'file':
-            continue
-        file_name = file_info['name']
-        file_url = file_info.get('download_url')
-        if not file_url:
-            click.echo(click.style(f"[-] Download URL not found for {file_name}", fg='red'))
-            continue
-        file_path = os.path.join(target_path, file_name)
-        if check:
-            if file_name not in local_files:
-                download_and_save_file(file_url, file_path)
-            else:
-                with open(file_path, 'rb') as f:
-                    existing_content = f.read()
-                existing_sha1 = calculate_git_blob_sha1(existing_content)
-                expected_sha1 = file_info.get('sha')
-                if existing_sha1 != expected_sha1:
-                    download_and_save_file(file_url, file_path)
-                    click.echo(click.style(f"[+] Updated {file_path}", fg='green'))
-        else:
-            download_and_save_file(file_url, file_path)
-                
-def download_and_save_file(url, file_path):
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(file_path, 'wb') as f:
-            f.write(response.content)
-            click.echo(click.style(f"[+] Downloaded {file_path}", fg='green'))
-    else:
-        click.echo(click.style(f"[-] Failed to download {file_path}", fg='red'))
-
-def calculate_git_blob_sha1(data):
-    content_length = len(data)
-    return hashlib.sha1(f'blob {content_length}\0'.encode() + data).hexdigest()
-
-
-def list_local_files(directory_path):
-    return set(os.listdir(directory_path))
-
-def update_self_function():
-    try:
-        subprocess.run(['pip', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
-        click.echo(click.style("[+] Successfully updated the tool.", fg='green'))
-    except subprocess.CalledProcessError as e:
-        click.echo(click.style(f"[-] Failed to update the tool: {e}", fg='red'))
-        
-def example():
-    examples = [
-        {
-            "command": "serve --list",
-            "description": "Lists all available aliases."
-        },
-        {
-            "command": "serve --search seatbelt",
-            "description": "Searches for aliases containing the word 'seatbelt'."
-        },
-        {
-            "command": "serve --search seatbelt -u 3",
-            "description": "Uses the 3rd alias from the search results for 'seatbelt'."
-        },
-        {
-            "command": "serve --https 9000",
-            "description": "Serves using HTTPS on port 9000."
-        },
-        {
-            "command": "serve --http 8000",
-            "description": "Serves using HTTP on port 8000."
-        },
-        {
-            "command": "serve -d /path/to/directory",
-            "description": "Serves a directory located at '/path/to/directory'."
-        },
-        {
-            "command": "serve -f /path/to/file",
-            "description": "Serves a file located at '/path/to/file'."
-        }
-    ]
-    
-    click.echo("Examples of how to use this tool:\n")
-    for example in examples:
-        click.echo(click.echo(click.style(f"[+] Command:\n  {example['command']}", fg='green')))
-        click.echo(click.echo(click.style(f"[+] Description:\n  {example['description']}", fg='yellow')))
-        click.echo('-' * 50)
-
+                                    
 if __name__ == "__main__":
     target_directory = os.path.dirname(os.path.abspath(__file__))   
-    cli()
+    cli(obj={})

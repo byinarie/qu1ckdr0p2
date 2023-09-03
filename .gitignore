@@ -1,7 +1,8 @@
 downloads
 certs
 config/settings.ini
-qu1ckdr0p.code-workspace
+qu1ckdr0p2.code-workspace
+qu1ckdr0p2/api_check.py
 start.sh
 payloads/
 # Byte-compiled / optimized / DLL files
