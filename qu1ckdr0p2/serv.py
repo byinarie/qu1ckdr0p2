@@ -10,6 +10,9 @@ import click
 import configparser
 import requests
 import subprocess
+import signal
+import sys
+
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -38,6 +41,12 @@ aliases = {}
 for section in config.sections():
     for key, value in config.items(section):
         aliases[key.lower()] = os.path.join(base_dir, value)
+
+def signal_handler(signum, frame):
+    click.echo(click.style(f"\n[!] ", fg='green') + click.style("CTRL+C detected, quitting\n", fg='yellow'))
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
                 
 def get_interface_ip(interface):
     try:
@@ -109,7 +118,6 @@ def display_aliases(search=None):
         click.echo(click.style(f"[→] ", fg='green') + click.style("Use: ", fg='yellow') + click.style(f"{counter}", fg='blue'))
         counter += 1
 
-          
 def load_config(file_path):
     config = configparser.ConfigParser()
     config.read(file_path)
@@ -186,7 +194,6 @@ def invoke_serve_by_number(search=None, use=None, http=None, https=None):
     selected_alias = list(search_results.keys())[use - 1]
     selected_path = search_results[selected_alias]
     
-    # Default to HTTPS on port 443 if no port is specified
     if not http and not https:
         https = 443
     
@@ -326,44 +333,6 @@ def update_self_function():
         click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
     except subprocess.CalledProcessError as e:
         click.echo(click.style(f"[→] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
-
-def example():
-    examples = [
-        {
-            "command": "serve --search seatbelt",
-            "description": "Searches for aliases containing the word 'seatbelt'."
-        },
-        {
-            "command": "serve --search seatbelt -u ",
-            "description": "Searches for aliases containing the word 'seatbelt'."
-        },
-        {
-            "command": "serve --search seatbelt -u 3",
-            "description": "Uses the 3rd alias from the search results for 'seatbelt'."
-        },
-        {
-            "command": "serve [-f, -d, --search --https 9000",
-            "description": "Serves using HTTPS on port 9000."
-        },
-        {
-            "command": "serve --http 8000",
-            "description": "Serves using HTTP on port 8000."
-        },
-        {
-            "command": "serve -d /path/to/directory",
-            "description": "Serves a directory located at '/path/to/directory'."
-        },
-        {
-            "command": "serve -f /path/to/file",
-            "description": "Serves a file located at '/path/to/file'."
-        }
-    ]
-    
-    click.echo(click.style(f"[→] ", fg='green') + click.style("Examples:\n", fg='green'))
-    for example in examples:
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Command:\n  {example['command']}", fg='green'))
-        click.echo(click.style(f"[→] Description:\n  {example['description']}", fg='yellow'))
-        click.echo(click.style(f"'-' * 50", fg='yellow'))
         
 @cli.command()
 @click.option('--check', is_flag=True, help='Check and download missing or outdated files.')
