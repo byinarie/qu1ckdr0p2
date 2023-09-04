@@ -1,4 +1,4 @@
-name: Publish to Test PyPI
+name: Publish Python 🐍 distributions 📦 to TestPyPI
 
 on:
   push:
@@ -9,36 +9,27 @@ on:
       - 'pyproject.toml'
       - 'poetry.lock'
   workflow_dispatch:
-
+  
 jobs:
-  build:
+  build-n-publish:
+    name: Build and publish Python 🐍 distributions 📦 TestPyPI
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-
+    - uses: actions/checkout@v3
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
-        python-version: '3.x'
-    
-    - name: Install dependencies
-      run: |
-        pip install poetry
-    
-    - name: Configure Test PyPI Repository
-      run: poetry config repositories.testpypi https://test.pypi.org/legacy/
-
-    - name: Debug Token Length
-      run: echo "Token length is ${#POETRY_PYPI_TOKEN_TEST_PYPI}"
-      env:
-        POETRY_PYPI_TOKEN_TEST_PYPI: ${{ secrets.PUBLISH_TO_TEST_PYPI }}
-
-    - name: Build package
-      run: poetry build
-
-    - name: Publish package to Test PyPI
-      run: poetry publish --repository testpypi
-      env:
-        POETRY_PYPI_TOKEN_TEST_PYPI: ${{ secrets.PUBLISH_TO_TEST_PYPI }}
+        python-version: "3.9^"
+        
+    - name: Install pypa/build
+      run: python3 -m pip install build --user
+      
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build --sdist --wheel --outdir dist/
+      
+    - name: Publish distribution 📦 to Test PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        repository-url: https://test.pypi.org/legacy/
