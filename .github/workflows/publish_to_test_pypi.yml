@@ -12,7 +12,7 @@ on:
   
 jobs:
   build-n-publish:
-    name: Build and publish Python 🐍 distributions 📦 TestPyPI
+    name: Build and publish TestPyPI
     runs-on: ubuntu-latest
     
     steps:
