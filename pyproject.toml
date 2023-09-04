@@ -19,7 +19,6 @@ requests = "2.31.0"
 tqdm = "4.65.0"
 pyopenssl = "^23.2.0"
 configparser = "^6.0.0"
-logging = "^0.4.9.6"
 
 [tool.poetry.scripts]
 serv = "qu1ckdr0p2.serv:cli"
