@@ -2,6 +2,7 @@ import hashlib
 from flask import Flask, send_from_directory
 from flask import render_template_string
 from tqdm import tqdm
+from halo import Halo
 from OpenSSL import crypto
 import os
 import netifaces as ni
@@ -13,7 +14,8 @@ import subprocess
 import signal
 import sys
 
-
+cli = sys.modules['flask.cli']
+cli.show_server_banner = lambda *x: None
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -127,19 +129,27 @@ def load_config(file_path):
             aliases[key.lower()] = os.path.join(base_dir, value)
     return aliases
 
+
 def print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert=None, privkey=None):
     relative_path = os.path.relpath(path_to_serve, start=base_dir)  
-    
-    click.echo(click.style(f"\n[→] ", fg='green') + click.style("Serving:", fg='yellow') + click.style(f" {relative_path}", fg='blue'))
+    spinner = Halo(spinner='dots', color='cyan', text_color='yellow')
+
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Serving:", fg='yellow') + click.style(f" {relative_path}", fg='blue'))
     click.echo(click.style(f"[→] ", fg='green') + click.style("Protocol:", fg='yellow') + click.style(f" {protocol}", fg='blue'))
     click.echo(click.style(f"[→] ", fg='green') + click.style("IP address:", fg='yellow') + click.style(f" {ip_address}", fg='blue'))
     click.echo(click.style(f"[→] ", fg='green') + click.style("Port:", fg='yellow') + click.style(f" {port}", fg='blue'))    
-    click.echo(click.style(f"[→] ", fg='green') + click.style("Interface:", fg='yellow') + click.style(f" {interface_name}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Interface:", fg='yellow') + click.style(f" {interface_name}", fg='blue'))  
+
     if cert and privkey:
         click.echo(click.style(f"[→] ", fg='green') + click.style("Using cert:", fg='yellow') + click.style(f" {cert}", fg='blue'))
         click.echo(click.style(f"[→] ", fg='green') + click.style("Using key:", fg='yellow') + click.style(f" {privkey}", fg='blue'))
-    click.echo(click.style(f"[→] ", fg='green') + click.style("CTRL+C to quit\n", fg='yellow'))
-    click.echo(click.style(f"\n[→] ", fg='green') + click.style("URL:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}\n\n", fg='blue'))
+
+    click.echo(click.style(f"[→] ", fg='green') + click.style("CTRL+C to quit", fg='yellow'))
+    click.echo(click.style(f"\n[→] ", fg='green') + click.style("URL:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}\n", fg='blue'))
+
+    # Start a new spinner to indicate that the web server is running
+    spinner.start("Web server running...")
+  
     
 def serve_files(path_to_serve, http_port=80, https_port=443):
     if os.path.isdir(path_to_serve):
@@ -155,8 +165,8 @@ def serve_files(path_to_serve, http_port=80, https_port=443):
         
         filename = os.path.basename(path_to_serve)
     else:
-        directory, filename = os.path.split(path_to_serve)
-        
+        directory, filename = os.path.split(path_to_serve)   
+                
         @app.route('/')
         def index():
             return f'<a href="/{filename}">-> {filename}</a>'
@@ -177,11 +187,11 @@ def serve_files(path_to_serve, http_port=80, https_port=443):
     print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert_path, key_path)
     
     if http_port:
-        app.run(host='0.0.0.0', port=http_port)
+        app.run(host='0.0.0.0', port=http_port, threaded=True)
     elif https_port:
         cert_path, key_path = generate_self_signed_cert(cert_dir)
         if cert_path and key_path:
-            app.run(host='0.0.0.0', port=https_port, ssl_context=(cert_path, key_path))
+            app.run(host='0.0.0.0', port=https_port, ssl_context=(cert_path, key_path), threaded=True)
         else:
             click.echo(click.style(f"\n[!] ", fg='red') + click.style("Could not generate or find SSL certificates.\n", fg='yellow'))
 
@@ -203,6 +213,88 @@ def invoke_serve_by_number(search=None, use=None, http=None, https=None):
     selected_path = search_results[selected_alias]
     serve_files(selected_path, http, https)
 
+def create_directory(dir_path):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Created directory:", fg='yellow') + click.style(f" {dir_path}", fg='blue'))
+
+def handle_github_auth(api_key):    
+    if api_key:
+        spinner = Halo(spinner='dots', color='cyan', text_color='cyan')
+        spinner.start()        
+        click.echo(click.style(f"[→] Using Github API key for authentication", fg='green'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Using Github API key for authentication", fg='yellow'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Github API key:", fg='yellow') + click.style(f" {api_key}", fg='blue'))
+    else:
+        spinner = Halo(spinner='dots', color='cyan', text_color='cyan')
+        spinner.start()        
+        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
+
+def handle_directory(directory, headers, check):
+    target_path = os.path.join(base_dir, directory)
+    target_url = f"https://api.github.com/repos/byinarie/qu1ckdr0p2/contents/qu1ckdr0p2/{directory}"         
+    response = requests.get(target_url, headers=headers)
+    if response.status_code != 200:
+        click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to fetch directory contents for:", fg='yellow') 
+                   + click.style(f" {target_url}", fg='blue') + click.style(f" \nStatus Code:", fg='yellow') + click.style(f" {response.status_code}", fg='red')
+                   + click.style(f" \nReason:", fg='yellow') + click.style(f" {response.reason}\n", fg='red')
+        )
+        return
+
+    files = response.json()
+    local_files = list_local_files(target_path)
+
+    spinner = Halo(text='Processing files', spinner='dots', color='cyan')
+    spinner.start()
+
+    for file_info in files:
+        if file_info['type'] != 'file':
+            continue
+        file_name = file_info['name']
+        file_url = file_info.get('download_url')
+        if not file_url:
+            click.echo(click.style(f"[-] ", fg='red') + click.style("Download URL not found", fg='yellow') + click.style(f" {file_name}\n\n", fg='blue'))
+            continue
+        file_path = os.path.join(target_path, file_name)
+        if check:
+            if file_name not in local_files:
+                download_and_save_file(file_url, file_path)
+            else:
+                with open(file_path, 'rb') as f:
+                    existing_content = f.read()
+                existing_sha1 = calculate_git_blob_sha1(existing_content)
+                expected_sha1 = file_info.get('sha')
+                if existing_sha1 != expected_sha1:
+                    download_and_save_file(file_url, file_path)
+                    click.echo(click.style(f"[→] ", fg='green') + click.style("Updated: ", fg='yellow') + click.style(f" {file_url}\n\n", fg='blue'))
+        else:
+            download_and_save_file(file_url, file_path)
+
+    spinner.stop()
+                
+def download_and_save_file(url, file_path):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+            click.echo(click.style(f"[→] ", fg='green') + click.style("Downloaded", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
+    else:
+        click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to download", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
+
+def calculate_git_blob_sha1(data):
+    content_length = len(data)
+    return hashlib.sha1(f'blob {content_length}\0'.encode() + data).hexdigest()
+
+def list_local_files(directory_path):
+    return set(os.listdir(directory_path))
+
+def update_self_function():
+    try:
+        subprocess.run(['pip', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
+    except subprocess.CalledProcessError as e:
+        click.echo(click.style(f"[→] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
+                
 @click.group()
 @click.option('--debug', is_flag=True, help='Enable debug mode.')
 @click.pass_context
@@ -229,7 +321,6 @@ def cli(ctx, debug):
 def serve(ctx, list_flag, search, use, directory, file, http, https):
     """Serve files."""          
     if not any([list_flag, search, use, directory, file, http, https]):
-        print("No options provided. Displaying help:")
         click.echo(ctx.get_help())
         return
         
@@ -260,80 +351,6 @@ def serve(ctx, list_flag, search, use, directory, file, http, https):
         serve_files(file, http, https)
         return
 
-def create_directory(dir_path):
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Created directory:", fg='yellow') + click.style(f" {dir_path}", fg='blue'))
-
-def handle_github_auth(api_key):
-    if api_key:
-        click.echo(click.style(f"[→] Using Github API key for authentication", fg='green'))
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Using Github API key for authentication", fg='yellow'))
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Github API key:", fg='yellow') + click.style(f" {api_key}", fg='blue'))
-    else:
-        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
-        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
-        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
-        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
-
-def handle_directory(directory, headers, check):
-    target_path = os.path.join(base_dir, directory)
-    target_url = f"https://api.github.com/repos/byinarie/qu1ckdr0p2/contents/qu1ckdr0p2/{directory}"
-            
-    response = requests.get(target_url, headers=headers)
-    if response.status_code != 200:
-        click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to fetch directory contents", fg='yellow') + click.style(f" {target_url}", fg='blue') + click.style(f" Status Code: {response.status_code}, Reason: {response.reason}", fg='yellow'))
-        return
-
-    files = response.json()
-    local_files = list_local_files(target_path)
-    
-    for file_info in files:
-        if file_info['type'] != 'file':
-            continue
-        file_name = file_info['name']
-        file_url = file_info.get('download_url')
-        if not file_url:
-            click.echo(click.style(f"[-] ", fg='red') + click.style("Download URL not found", fg='yellow') + click.style(f" {file_name}\n\n", fg='blue'))
-            continue
-        file_path = os.path.join(target_path, file_name)
-        if check:
-            if file_name not in local_files:
-                download_and_save_file(file_url, file_path)
-            else:
-                with open(file_path, 'rb') as f:
-                    existing_content = f.read()
-                existing_sha1 = calculate_git_blob_sha1(existing_content)
-                expected_sha1 = file_info.get('sha')
-                if existing_sha1 != expected_sha1:
-                    download_and_save_file(file_url, file_path)
-                    click.echo(click.style(f"[→] ", fg='green') + click.style("Updated: ", fg='yellow') + click.style(f" {file_url}\n\n", fg='blue'))
-        else:
-            download_and_save_file(file_url, file_path)
-                
-def download_and_save_file(url, file_path):
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(file_path, 'wb') as f:
-            f.write(response.content)
-            click.echo(click.style(f"[→] ", fg='green') + click.style("Downloaded", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
-    else:
-        click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to download", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
-
-def calculate_git_blob_sha1(data):
-    content_length = len(data)
-    return hashlib.sha1(f'blob {content_length}\0'.encode() + data).hexdigest()
-
-def list_local_files(directory_path):
-    return set(os.listdir(directory_path))
-
-def update_self_function():
-    try:
-        subprocess.run(['pip', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
-    except subprocess.CalledProcessError as e:
-        click.echo(click.style(f"[→] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
-        
 @cli.command()
 @click.option('--check', is_flag=True, help='Check and download missing or outdated files.')
 @click.option('--skip-config', is_flag=True, help='Skip checking the config directory.')
@@ -345,6 +362,9 @@ def update_self_function():
 @click.option('--update-self-test', is_flag=True, help='Used for dev testing, installs unstable build.')
 def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update_self, update_self_test):
     """Configure or update."""
+    spinner = Halo(spinner='dots', color='cyan', text_color='cyan')
+    spinner.start()
+
     if update_self:
         subprocess.run(["pip", "install", "--upgrade", "your-package-name"])
     elif update_self_test:
@@ -372,7 +392,9 @@ def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update
         if directory in skip_directories:
             continue
         handle_directory(directory, headers, check)
-                                    
+
+    spinner.stop()
+                                            
 if __name__ == "__main__":
     target_directory = os.path.dirname(os.path.abspath(__file__))   
     cli(obj={})
