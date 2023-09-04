@@ -1,4 +1,4 @@
-name: Publish to TestPyPI
+name: Publish to TestPyPI using Trusted Publisher
 
 on:
   push:
@@ -9,29 +9,27 @@ on:
       - 'pyproject.toml'
       - 'poetry.lock'
   workflow_dispatch:
-  
+
 jobs:
   build-n-publish:
-    name: Build and publish TestPyPI
+    name: Build and publish TestPyPI using Trusted Publisher
     runs-on: ubuntu-latest
-    
+    permissions:
+      id-token: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      
-    - name: Set up Python
-      uses: actions/setup-python@v2
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-python@v2
       with:
         python-version: '3.x'
         
     - name: Install dependencies
       run: pip install poetry
-      
+
     - name: Build package
       run: poetry build
-      
-    - name: Publish package to Test PyPI
+    
+    - name: Publish package to TestPyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
-        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         repository-url: https://test.pypi.org/legacy/
