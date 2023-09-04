@@ -24,7 +24,7 @@ user_home = os.path.expanduser("~")
 base_dir = os.path.join(user_home, ".qu1ckdr0p2")
 directory = os.path.dirname(os.path.abspath(__file__))
 
-target_directories = ["config", "windows", "linux", "mac"]
+target_directories = ["config", "windows", "linux", "mac", "windows/powershell"]
 other_directories = ["payloads", "certs"]
 
 payloads = os.path.join(user_home, ".qu1ckdr0p2", 'payloads')
@@ -150,7 +150,6 @@ def print_server_info(path_to_serve, protocol, ip_address, interface_name, port,
     # Start a new spinner to indicate that the web server is running
     spinner.start("Web server running...")
   
-    
 def serve_files(path_to_serve, http_port=80, https_port=443):
     if os.path.isdir(path_to_serve):
         @app.route('/')
@@ -220,15 +219,16 @@ def create_directory(dir_path):
 
 def handle_github_auth(api_key):    
     if api_key:
-        spinner = Halo(spinner='dots', color='cyan', text_color='cyan')
-        spinner.start()        
-        click.echo(click.style(f"[→] Using Github API key for authentication", fg='green'))
         click.echo(click.style(f"[→] ", fg='green') + click.style("Using Github API key for authentication", fg='yellow'))
         click.echo(click.style(f"[→] ", fg='green') + click.style("Github API key:", fg='yellow') + click.style(f" {api_key}", fg='blue'))
     else:
-        spinner = Halo(spinner='dots', color='cyan', text_color='cyan')
-        spinner.start()        
         click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
+        click.echo(click.style(f"[→] ", fg='red') + click.style("An API key is required to avoid rate limiting during downloads.", fg='yellow'))
+        click.echo(click.style(f"[→] ", fg='red') + click.style("This will be resolved in the future using releases.", fg='yellow'))
+        
+
+        sys.exit(0)
+        
 
 def handle_directory(directory, headers, check):
     target_path = os.path.join(base_dir, directory)
@@ -244,10 +244,7 @@ def handle_directory(directory, headers, check):
     files = response.json()
     local_files = list_local_files(target_path)
 
-    spinner = Halo(text='Processing files', spinner='dots', color='cyan')
-    spinner.start()
-
-    for file_info in files:
+    for file_info in tqdm(files, desc='Processing files', unit='file'):
         if file_info['type'] != 'file':
             continue
         file_name = file_info['name']
@@ -270,14 +267,12 @@ def handle_directory(directory, headers, check):
         else:
             download_and_save_file(file_url, file_path)
 
-    spinner.stop()
-                
 def download_and_save_file(url, file_path):
     response = requests.get(url)
     if response.status_code == 200:
         with open(file_path, 'wb') as f:
             f.write(response.content)
-            click.echo(click.style(f"[→] ", fg='green') + click.style("Downloaded", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
+            click.echo(click.style(f"[→] ", fg='green') + click.style("Downloaded", fg='yellow') + click.style(f" {file_path}\n", fg='blue'))
     else:
         click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to download", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
 
@@ -362,9 +357,6 @@ def serve(ctx, list_flag, search, use, directory, file, http, https):
 @click.option('--update-self-test', is_flag=True, help='Used for dev testing, installs unstable build.')
 def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update_self, update_self_test):
     """Configure or update."""
-    spinner = Halo(spinner='dots', color='cyan', text_color='cyan')
-    spinner.start()
-
     if update_self:
         subprocess.run(["pip", "install", "--upgrade", "your-package-name"])
     elif update_self_test:
@@ -392,8 +384,6 @@ def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update
         if directory in skip_directories:
             continue
         handle_directory(directory, headers, check)
-
-    spinner.stop()
                                             
 if __name__ == "__main__":
     target_directory = os.path.dirname(os.path.abspath(__file__))   
