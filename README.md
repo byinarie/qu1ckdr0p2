@@ -1,41 +1,49 @@
-
 <h1 align="center">
-    <img src="img/quick_drop_small.png"</img>
+    <img src="img/quick_drop_small.png"></img>
 </h1>
+<div align="center">
+    <img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="`Python` Badge"></img>
+    <img src="https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white" alt="`Flask` Badge"></img>
+</div>
+<div align="center">
+    <img src="https://img.shields.io/badge/Visual%20Studio%20Code-0078d7.svg?style=for-the-badge&logo=visual-studio-code&logoColor=white" alt="`Visual Studio Code` Badge"></img>
+</div>
+<h4 align="center">Rapidly host payloads and post-exploitation bins over HTTP or HTTPS.</h4>
+<h6 align="center">Designed to be used on exams like OSCP / PNPT or CTFs HTB / etc.</h6>
+<h6 align="center">Pull requests and issues welcome. As are any contributions.</h6>
 
-<h4 align="center">Rapidly host payloads and post-exploitation bins over http or https.</h4>
-<h6 align="center">Designed to be used on exams like OSCP / PNPT or CTFs HTB / etc.</h4>
-<h6 align="center">Pull requests and issues welcome. As are any contributions.</h4>
+
+
 
 <p align="center">
   <a href="#install">Install</a> •
-  <a href="#install">About</a> •
-  <a href="#examples">Examples</a> •
+  <a href="#about">About</a> •
+  <a href="#usage">Usage</a> •
   <a href="#license">License</a>
 </p>
 
+
+
 ## About
-Qu1ckdr0p2 comes with an alias and search feature and many tools located in the https://github.com/byinarie/qu1ckdr0p2-tools repository. 
+Qu1ckdr0p2 comes with an alias and search feature. The tools are located in the <a href ="https://github.com/byinarie/qu1ckdr0p2-tools">qu1ckdr0p2-tools</a> repository.
 
-By default it will generate a self-signed TLS cerficiate to use when using the `--https` option, priory is also given to the `tun0` interface when the webserver is running, otherwise it will use `eth0`.
+By default it will generate a self-signed certificate to use when using the `--https` option, priority is also given to the `tun0` interface when the webserver is running, otherwise it will use `eth0`.
 
-The common.ini https://github.com/byinarie/qu1ckdr0p2-tools/blob/main/config/common.ini contains the mapped aliases used within the `--search and -u` options.
-
-I eventually plan on including a pipeline for handling updates to the included tools but as of now its not implemented.
+The <a href="https://github.com/byinarie/qu1ckdr0p2-tools/blob/main/config/common.ini">common.ini</a> defines the mapped aliases used within the `--search and -u` options.
 
 When the webserver is running there are several download cradles printed to the screen to copy and paste.
 
 ## Install
+#### Using pip is the only supported way of installing. Cloning this repository to install will probably break something
 ```zsh
 pip3 install qu1ckdr0p2
 serv init --update
 ```
 
-## Basic usage
+## Usage
 ### Serv a single file located in your current working directory
 ```zsh
-serv --help
-serv init --update
+serv serve --help
 serv serve -f implant.bin --https 443
 serv serve -f file.example --http 8080
 ```

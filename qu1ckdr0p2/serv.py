@@ -363,7 +363,7 @@ def init(update, update_self, update_self_test):
     """Perform updates."""
     if update:
         check_and_update_tools()
-    if self_update:
+    if update_self:
         update_pip3()
 
 
