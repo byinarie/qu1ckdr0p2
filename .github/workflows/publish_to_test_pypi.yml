@@ -1,0 +1,35 @@
+name: Publish to TestPyPI using Trusted Publisher
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'qu1ckdr0p2/qu1ckdr0p2/serv.py'
+      - 'pyproject.toml'
+      - 'poetry.lock'
+  workflow_dispatch:
+
+jobs:
+  build-n-publish:
+    name: Build and publish TestPyPI using Trusted Publisher
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+        
+    - name: Install dependencies
+      run: pip install poetry
+
+    - name: Build package
+      run: poetry build
+    
+    - name: Publish package to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/

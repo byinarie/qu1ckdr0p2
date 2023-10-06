@@ -1,28 +1,33 @@
 [tool.poetry]
 name = "qu1ckdr0p2"
-version = "2.0.1"
+version = "2.5.3"
 description = "Rapid file hosting."
 authors = ["byinarie <byinarie@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+include = ["qu1ckdr0p2/serv.py"]
+exclude = ["*"]
+
+
 
 [tool.poetry.dependencies]
-python = "^3.11"
-click = "8.1.3"
-flask = "2.2.5"
-netifaces = "0.11.0"
-requests = "2.31.0"
-tqdm = "4.65.0"
+python = "^3.11.0"
+click = "^8.0"
+flask = "^2.0"
+netifaces = "^0.11"
+requests = "^2.31"
+tqdm = "^4.0"
+pyopenssl = "^23.0"
+configparser = "^6.0"
+halo = "^0.0.31"
+keyboard = "^0.13.5"
+pyperclip = "^1.8.2"
 
 [tool.poetry.scripts]
-qu1ckdr0p = "qu1ckdr0p2.serv:main"
+serv = "qu1ckdr0p2.serv:cli"
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[build]
-exclude = [
-    "config/settings.ini"
-]

