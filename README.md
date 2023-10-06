@@ -28,6 +28,9 @@ When the webserver is running there are several download cradles printed to the 
 ```zsh
 pip3 install qu1ckdr0p2
 serv init --update
+
+echo "alias serv='~/.local/bin/serv'" >> ~/.zshrc
+source ~/.zshrc
 ```
 
 ## Usage
