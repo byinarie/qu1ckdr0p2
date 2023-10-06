@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qu1ckdr0p2"
-version = "2.5.4"
+version = "2.5.6"
 description = "Rapid file hosting."
 authors = ["byinarie <byinarie@gmail.com>"]
 license = "MIT"
