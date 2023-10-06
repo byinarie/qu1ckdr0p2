@@ -44,11 +44,61 @@ source ~/.bashrc
 ## Usage
 ### Serv a single file located in your current working directory
 ```zsh
-serv serve --help
 serv serve -f implant.bin --https 443
+```
+```zsh
 serv serve -f file.example --http 8080
 ```
 
+## Update and help
+```zsh
+  serv --help            
+Usage: serv [OPTIONS] COMMAND [ARGS]...
+
+  Welcome to qu1ckdr0p2 entry point.
+
+Options:
+  --debug  Enable debug mode.
+  --help   Show this message and exit.
+
+Commands:
+  init   Perform updates.
+  serve  Serve files.
+```
+```zsh
+  serv serve --help
+Usage: serv serve [OPTIONS]
+
+  Serve files.
+
+Options:
+  -l, --list         List aliases
+  -s, --search TEXT  Search query for aliases
+  -u, --use INTEGER  Use an alias by a dynamic number
+  -f, --file FILE    Serve a file
+  --http INTEGER     Use HTTP with a custom port
+  --https INTEGER    Use HTTPS with a custom port
+  -h, --help         Show this message and exit.
+```
+```zsh
+  serv init --help       
+Usage: serv init [OPTIONS]
+
+  Perform updates.
+
+Options:
+  --update            Check and download missing tools.
+  --update-self       Update the tool using pip.
+  --update-self-test  Used for dev testing, installs unstable build.
+  --help              Show this message and exit.
+```
+
+```zsh
+serv init --update
+```
+```zsh
+serv init --update-self
+```
 ### Serv a file from a mapped alias
 The mapped alias numbers for the `-u` option are dynamic so you don't have to remember specific numbers or ever type out a tool name.
 ```zsh
