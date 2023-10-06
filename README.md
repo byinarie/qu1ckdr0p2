@@ -44,15 +44,15 @@ source ~/.bashrc
 ## Usage
 ### Serv a single file located in your current working directory
 ```zsh
-serv serve -f implant.bin --https 443
+$ serv serve -f implant.bin --https 443
 ```
 ```zsh
-serv serve -f file.example --http 8080
+$ serv serve -f file.example --http 8080
 ```
 
 ## Update and help
 ```zsh
-  serv --help            
+$ serv --help            
 Usage: serv [OPTIONS] COMMAND [ARGS]...
 
   Welcome to qu1ckdr0p2 entry point.
@@ -66,7 +66,7 @@ Commands:
   serve  Serve files.
 ```
 ```zsh
-  serv serve --help
+$ serv serve --help
 Usage: serv serve [OPTIONS]
 
   Serve files.
@@ -81,7 +81,7 @@ Options:
   -h, --help         Show this message and exit.
 ```
 ```zsh
-  serv init --help       
+$ serv init --help       
 Usage: serv init [OPTIONS]
 
   Perform updates.
