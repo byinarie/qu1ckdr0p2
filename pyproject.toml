@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "qu1ckdr0p2"
-version = "2.5.0"
+version = "2.5.1"
 description = "Rapid file hosting."
 authors = ["byinarie <byinarie@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-include = ["qu1ckdr0p2/serv.py", "qu1ckdr0p2/config/repos.ini", "qu1ckdr0p2/config/common.ini", "qu1ckdr0p2/config/settings.ini.template"]
+include = ["qu1ckdr0p2/serv.py"]
 exclude = ["*"]
 
 

