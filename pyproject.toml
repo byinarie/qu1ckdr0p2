@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "qu1ckdr0p2"
-version = "2.3.11"
+version = "2.5.0"
 description = "Rapid file hosting."
 authors = ["byinarie <byinarie@gmail.com>"]
 license = "MIT"
@@ -11,7 +11,7 @@ exclude = ["*"]
 
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.11.0"
 click = "^8.0"
 flask = "^2.0"
 netifaces = "^0.11"
@@ -21,6 +21,7 @@ pyopenssl = "^23.0"
 configparser = "^6.0"
 halo = "^0.0.31"
 keyboard = "^0.13.5"
+pyperclip = "^1.8.2"
 
 [tool.poetry.scripts]
 serv = "qu1ckdr0p2.serv:cli"
