@@ -1,30 +1,18 @@
 <h1 align="center">
     <img src="img/quick_drop_small.png"></img>
+
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white)
+![Visual Studio Code](https://img.shields.io/badge/Visual%20Studio%20Code-0078d7.svg?style=for-the-badge&logo=visual-studio-code&logoColor=white)
+![Prettier](https://img.shields.io/badge/prettier-1A2C34?style=for-the-badge&logo=prettier&logoColor=F7BA3E
+)
 </h1>
-<div align="center">
-    <img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="`Python` Badge"></img>
-    <img src="https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white" alt="`Flask` Badge"></img>
-</div>
-<div align="center">
-    <img src="https://img.shields.io/badge/Visual%20Studio%20Code-0078d7.svg?style=for-the-badge&logo=visual-studio-code&logoColor=white" alt="`Visual Studio Code` Badge"></img>
-</div>
-<h4 align="center">Rapidly host payloads and post-exploitation bins over HTTP or HTTPS.</h4>
-<h6 align="center">Designed to be used on exams like OSCP / PNPT or CTFs HTB / etc.</h6>
-<h6 align="center">Pull requests and issues welcome. As are any contributions.</h6>
-
-
-
-
-<p align="center">
-  <a href="#install">Install</a> •
-  <a href="#about">About</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#license">License</a>
-</p>
-
-
 
 ## About
+Rapidly host payloads and post-exploitation bins over HTTP or HTTPS. 
+Designed to be used on exams like OSCP / PNPT or CTFs HTB / etc.
+
+Pull requests and issues welcome. As are any contributions.
 Qu1ckdr0p2 comes with an alias and search feature. The tools are located in the <a href ="https://github.com/byinarie/qu1ckdr0p2-tools">qu1ckdr0p2-tools</a> repository.
 
 By default it will generate a self-signed certificate to use when using the `--https` option, priority is also given to the `tun0` interface when the webserver is running, otherwise it will use `eth0`.
