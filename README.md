@@ -94,10 +94,10 @@ Options:
 ```
 
 ```zsh
-serv init --update
+$ serv init --update
 ```
 ```zsh
-serv init --update-self
+$ serv init --update-self
 ```
 ### Serv a file from a mapped alias
 The mapped alias numbers for the `-u` option are dynamic so you don't have to remember specific numbers or ever type out a tool name.
