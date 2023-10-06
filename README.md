@@ -24,7 +24,8 @@ The <a href="https://github.com/byinarie/qu1ckdr0p2-tools/blob/main/config/commo
 When the webserver is running there are several download cradles printed to the screen to copy and paste.
 
 ## Install
-#### Using pip is the only supported way of installing. Cloning this repository to install will probably break something
+#### Using pip is the only supported way of installing
+#### Cloning this repository to install will probably break something
 ```zsh
 pip3 install qu1ckdr0p2
 serv init --update
