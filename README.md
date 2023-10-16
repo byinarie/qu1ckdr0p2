@@ -28,17 +28,17 @@ When the webserver is running there are several download cradles printed to the 
 #### Cloning this repository to install will probably break something
 ```zsh
 pip3 install qu1ckdr0p2
-serv init --update
-```
-#### Export as an alias if needed
-```
+
 echo "alias serv='~/.local/bin/serv'" >> ~/.zshrc
 source ~/.zshrc
-```
 
-```
+or
+
 echo "alias serv='~/.local/bin/serv'" >> ~/.bashrc
 source ~/.bashrc
+
+serv init --update
+
 ```
 
 ## Usage
