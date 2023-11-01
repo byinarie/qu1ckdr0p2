@@ -22,6 +22,8 @@ Qu1ckdr0p2 comes with an alias and search feature. The tools are located in the 
 The <a href="https://github.com/byinarie/qu1ckdr0p2-tools/blob/main/config/common.ini">common.ini</a> defines the mapped aliases used within the `--search and -u` options.
 
 When the webserver is running there are several download cradles printed to the screen to copy and paste.
+## NOTE
+When you go to copy and paste a download cradle, depending on your terminal emulator of choice you may have to QUICKLY triple or double click the download cradle to highlight it for a copy. This will be fixed in a later version.
 
 ## Install
 #### Using pip is the only supported way of installing
